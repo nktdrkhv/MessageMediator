@@ -1,17 +1,14 @@
 using System.ComponentModel.DataAnnotations.Schema;
+using MessageMediator.ProofOfConcept.Abstract;
+using Telegram.Bot.Types;
 
 namespace MessageMediator.ProofOfConcept.Entities;
 
-[Table("LocalUser")]
-public class LocalUser
+[Table("User")]
+public class LocalUser : TelegramEntity
 {
-    public long Id { get; }
-    public DateTime CreatedAt { get; } = DateTime.UtcNow;
+    public ICollection<LocalChat>? ResponsibleFor { get; set; }
 
-    public string Name { get; private set; } = null!;
-    public string? Username { get; private set; }
-    public string? Alias { get; private set; }
-
-    public bool IsDisabled { get; private set; } = false;
-    public bool IsSelfBlocked { get; private set; } = false;
+    public LocalUser(User user) : base(user) { }
+    private LocalUser() { }
 }

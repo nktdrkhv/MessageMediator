@@ -1,19 +1,21 @@
 using System.ComponentModel.DataAnnotations.Schema;
+using MessageMediator.ProofOfConcept.Abstract;
+using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
 
 namespace MessageMediator.ProofOfConcept.Entities;
 
-[Table("LocalChat")]
-public class LocalChat
+[Table("Chat")]
+public class LocalChat : TelegramEntity
 {
-    public long Id { get; }
-    public DateTime CreatedAt { get; } = DateTime.UtcNow;
-    public ChatType ChatType { get; }
+    public ChatType ChatType { get; set; }
 
-    public string Title { get; private set; } = null!;
-    public string? Username { get; private set; }
-    public string? Alias { get; private set; }
+    public ICollection<LocalUser>? DecisionMakers { get; set; }
 
-    public bool IsDisabled { get; private set; } = false;
-    public bool IsSelfBlocked { get; private set; } = false;
+    public ICollection<Source>? SourcingFor { get; set; }
+    public ICollection<Worker>? WorkingOn { get; set; }
+    public ICollection<Supervisor>? SupervisingOn { get; set; }
+
+    public LocalChat(Chat chat) : base(chat) => ChatType = chat.Type;
+    private LocalChat() { }
 }

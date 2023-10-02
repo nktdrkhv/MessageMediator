@@ -1,9 +1,11 @@
+using System.ComponentModel.DataAnnotations.Schema;
 using MessageMediator.ProofOfConcept.Enums;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
 
 namespace MessageMediator.ProofOfConcept.Entities;
 
+[Table("Media")]
 public class Media
 {
     public int MediaId { get; private set; }

@@ -21,7 +21,7 @@ IHost host = Host.CreateDefaultBuilder(args)
                         useTestEnvironment: configuration.IsTestEnv);
                     return new TelegramBotClient(clientOptions, httpClient);
                 });
-        services.AddTelegramUpdater<Worker>(
+        services.AddTelegramUpdater<WorkerService>(
             new UpdaterOptions(
                 maxDegreeOfParallelism: 32,
                 flushUpdatesQueue: true,
@@ -30,8 +30,10 @@ IHost host = Host.CreateDefaultBuilder(args)
                 .AutoCollectScopedHandlers()
                 .AddDefaultExceptionHandler());
         services.AddDbContext<BotDbContext>();
-        services.AddHostedService<Worker>();
+        services.AddHostedService<WorkerService>();
     })
     .Build();
+
+//using var db = host.Services.CreateScope().ServiceProvider.GetRequiredService<BotDbContext>();
 
 host.Run();

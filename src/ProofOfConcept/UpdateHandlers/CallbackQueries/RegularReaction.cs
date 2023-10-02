@@ -9,17 +9,18 @@ using TelegramUpdater.UpdateHandlers.Scoped.ReadyToUse;
 
 namespace MessageMediator.ProofOfConcept.UpdateHandlers.CallbackQueries;
 
-public sealed class Reaction : CallbackQueryHandler
+[Order(10)]
+public sealed class RegularReaction : CallbackQueryHandler
 {
     private readonly BotDbContext _context;
 
-    public Reaction(BotDbContext context)
+    public RegularReaction(BotDbContext context)
     {
         _context = context;
     }
 
-    protected async override Task HandleAsync(IContainer<CallbackQuery> cntr)
+    protected override Task HandleAsync(IContainer<CallbackQuery> cntr)
     {
-
+        throw new NotImplementedException();
     }
 }

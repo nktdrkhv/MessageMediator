@@ -1,12 +1,17 @@
+using System.ComponentModel.DataAnnotations.Schema;
+using MessageMediator.ProofOfConcept.Abstract;
+
 namespace MessageMediator.ProofOfConcept.Entities;
 
-public class Chain
+[Table("Chain")]
+public class Chain : ICreatedAt
 {
-    public int ChainId { get; set; }
-    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public int ChainId { get; private set; }
+    public DateTime CreatedAt { get; private set; } = DateTime.UtcNow;
+    public DateTime? FinishedAt { get; set; }
 
-    public int ConnectedTriggerId { get; set; }
-    public ConnectedTrigger ConnectedTrigger { get; set; } = null!;
+    public int TriggerId { get; set; }
+    public Trigger Trigger { get; set; } = null!;
 
     public int ReasonId { get; set; }
     public LocalMessage Reason { get; set; } = null!;

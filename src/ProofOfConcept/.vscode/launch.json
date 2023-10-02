@@ -10,7 +10,7 @@
             "request": "launch",
             "preLaunchTask": "build",
             // Если вы изменили требуемые версии .NET Framework, обязательно обновите путь к программе.
-            "program": "${workspaceFolder}/bin/Debug/net7.0/MessageMediator.ProofOfConcept.dll",
+            "program": "${workspaceFolder}/bin/Debug/net6.0/MessageMediator.ProofOfConcept.dll",
             "args": [],
             "cwd": "${workspaceFolder}",
             // Дополнительные сведения о поле \"console\" см. в https://aka.ms/VSCode-CS-LaunchJson-Console

@@ -9,22 +9,18 @@ using TelegramUpdater.UpdateHandlers.Scoped.ReadyToUse;
 
 namespace MessageMediator.ProofOfConcept.UpdateHandlers.Messages;
 
-[Order(10), Command(prefix: '/', argumentsMode: ArgumentsMode.Idc, "start")]
-public sealed class Authorization : MessageHandler
+[Order(11), Replied]
+public sealed class RegularReply : MessageHandler
 {
     private readonly BotDbContext _context;
 
-    public Authorization(BotDbContext context) => _context = context;
-
-    protected override async Task HandleAsync(IContainer<Message> cntr)
+    public RegularReply(BotDbContext context)
     {
-        if (cntr.TryParseCommandArgs(out string? args) && args != null)
-        {
+        _context = context;
+    }
 
-        }
-        else
-        {
-
-        }
+    protected override Task HandleAsync(IContainer<Message> cntr)
+    {
+        throw new NotImplementedException();
     }
 }
