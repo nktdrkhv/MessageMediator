@@ -7,7 +7,7 @@ namespace MessageMediator.ProofOfConcept.Entities;
 [Table("Message")]
 public class LocalMessage : ICreatedAt
 {
-    public int LocalMessageId { get; private set; }
+    public int Id { get; private set; }
     public int TelegramMessageId { get; set; }
     public DateTime CreatedAt { get; private set; } = DateTime.UtcNow;
 

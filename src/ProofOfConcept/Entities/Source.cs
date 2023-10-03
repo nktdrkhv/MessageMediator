@@ -7,4 +7,5 @@ namespace MessageMediator.ProofOfConcept.Entities;
 public class Source : IssueEntity
 {
     public ICollection<Trigger>? Triggers { get; set; }
+    public ICollection<LocalChat>? Submitters { get; set; }
 }

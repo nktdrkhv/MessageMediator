@@ -29,8 +29,22 @@ public sealed class RegularIssue : MessageHandler
 
     protected override async Task HandleAsync(IContainer<Message> cntr)
     {
+        // -----------------------------------
+        // ----------- get entities ----------
+        // -----------------------------------
+
         var text = cntr.Update.Text ?? cntr.Update.Caption;
         if (text == null)
+            return;
+
+        var entities = cntr.Update.Entities?.Zip(cntr.Update.EntityValues!,
+            (first, second) => new OriginalEntity
+            {
+                Text = second[1..],
+                Type = first.Type,
+                Offset = first.Offset + first.Length
+            });
+        if (entities == null)
             return;
 
         // -----------------------------------
@@ -38,28 +52,19 @@ public sealed class RegularIssue : MessageHandler
         // -----------------------------------
 
         if (await _context.LocalChats.Where(lc => lc.Id == cntr.Update.Chat.Id)
+            .AsSplitQuery()
             .Include(lc => lc.DecisionMakers)
+            .Include(lc => lc.SourcingFor)
             .SingleOrDefaultAsync() is LocalChat chat)
         {
-            var entities = cntr.Update.Entities?.Zip(cntr.Update.EntityValues!,
-                (first, second) => new OriginalEntity
-                {
-                    Text = second[1..],
-                    Type = first.Type,
-                    Offset = first.Offset
-                });
-            if (entities == null)
-                return;
-
-            var matchesQuery = from s in _context.Sources
+            var matchesQuery = from s in chat.SourcingFor!.AsQueryable()
                                join t in _context.Triggers on s.Id equals t.SourceId
-                               join e in entities! on t.Type equals e.Type
-                               where s.ChatId == chat.Id
+                               join e in entities!.AsQueryable() on t.Type equals e.Type
                                where t.Text == e.Text
                                where !s.IsDisabled && !s.IsDeleted && !t.IsDisabled
                                select new MatchedTrigger
                                {
-                                   TriggerId = t.TriggerId,
+                                   TriggerId = t.Id,
                                    Behaviour = t.Behaviour,
                                    Offset = e.Offset
                                };
@@ -68,7 +73,7 @@ public sealed class RegularIssue : MessageHandler
                 return;
             for (var i = 0; i < matches.Length; i++)
             {
-                if (i - 1 > 0)
+                if (i - 1 >= 0)
                     matches[i].PreviousOffset = matches[i - 1].Offset;
                 if (i < matches.Length - 1)
                     matches[i].NextOffset = matches[i + 1].Offset;
@@ -78,7 +83,8 @@ public sealed class RegularIssue : MessageHandler
             // ---------- check rights -----------
             // -----------------------------------
 
-            var user = cntr.Update.From != null ? await GetLocalUserAsync(cntr.Update.From!) : null;
+            // todo: check fake user in non-channel chats
+            var user = cntr.Update.From != null ? await _context.GetOrCreateLocalUserAsync(cntr.Update.From!) : null;
             if ((chat.DecisionMakers != null && user == null) ||
                 (chat.DecisionMakers != null && user != null && !chat.DecisionMakers.Contains(user)))
             {
@@ -108,7 +114,7 @@ public sealed class RegularIssue : MessageHandler
             foreach (var match in matches)
             {
                 var trigger = _context.Triggers
-                    .Where(t => t.TriggerId == match.TriggerId)
+                    .Where(t => t.Id == match.TriggerId)
                     .AsSplitQuery()
                     .Include(t => t.Workers)
                     .Include(t => t.Supervisors)
@@ -131,7 +137,7 @@ public sealed class RegularIssue : MessageHandler
                 var chain = new Chain()
                 {
                     Trigger = trigger,
-                    Worker = worker,
+                    Worker = worker!,
                     Supervisor = supervisor,
                     Reason = reason,
                     PreparedData = concreteData
@@ -159,19 +165,6 @@ public sealed class RegularIssue : MessageHandler
                         disableNotification: true,
                         parseMode: ParseMode.Html);
             }
-        }
-    }
-
-    private async ValueTask<LocalUser> GetLocalUserAsync(User user)
-    {
-        if (await _context.LocalUsers.FindAsync(user.Id) is LocalUser localUser)
-            return localUser;
-        else
-        {
-            var newUser = new LocalUser(user);
-            await _context.LocalUsers.AddAsync(newUser);
-            await _context.SaveChangesAsync();
-            return newUser;
         }
     }
 }

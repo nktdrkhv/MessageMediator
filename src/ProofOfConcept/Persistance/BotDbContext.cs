@@ -23,7 +23,7 @@ public class BotDbContext : DbContext
 
     public BotDbContext()
     {
-        //Database.EnsureDeleted();
+        // Database.EnsureDeleted();
         Database.EnsureCreated();
     }
 
@@ -61,6 +61,10 @@ public class BotDbContext : DbContext
             .HasMany(lc => lc.DecisionMakers)
                 .WithMany(lu => lu.ResponsibleFor)
                 .UsingEntity(join => join.ToTable("ChatRuler"));
+        modelBuilder.Entity<LocalChat>()
+            .HasMany(lc => lc.SourcingFor)
+                .WithMany(s => s.Submitters)
+                .UsingEntity(join => join.ToTable("Submitter"));
     }
 
     protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)

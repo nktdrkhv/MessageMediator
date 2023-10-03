@@ -16,7 +16,7 @@ IHost host = Host.CreateDefaultBuilder(args)
                 {
                     var configuration = sp.GetService<IOptions<BotConfiguration>>()!.Value;
                     var clientOptions = new TelegramBotClientOptions(
-                        token: configuration.BotToken,
+                        token: configuration.ApiToken,
                         baseUrl: configuration.BaseUrl,
                         useTestEnvironment: configuration.IsTestEnv);
                     return new TelegramBotClient(clientOptions, httpClient);

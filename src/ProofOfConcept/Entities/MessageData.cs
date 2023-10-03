@@ -9,7 +9,7 @@ namespace MessageMediator.ProofOfConcept.Entities;
 [Table("MessageData")]
 public class MessageData
 {
-    public int MessageDataId { get; private set; }
+    public int Id { get; private set; }
     public MessageDataType Type { get; set; }
 
     public string? Text { get; set; }
@@ -19,21 +19,20 @@ public class MessageData
     public MessageData(string? text, params Message[] messages)
     {
         var firstOne = messages.First();
-        Type = firstOne.Type switch
-        {
-            MessageType.Text => MessageDataType.Text,
-            MessageType.Photo or
-            MessageType.Animation or
-            MessageType.Photo or
-            MessageType.Video or
-            MessageType.VideoNote or
-            MessageType.Audio or
-            MessageType.Voice or
-            MessageType.Document or
-            MessageType.Sticker => MessageDataType.Media,
-            MessageType.Contact => MessageDataType.Contact,
-            _ => MessageDataType.Unknown
-        };
+        if (messages.Length == 1)
+            Type = firstOne.Type switch
+            {
+                MessageType.Text => MessageDataType.Text,
+                MessageType.Photo or MessageType.Animation or MessageType.Photo or MessageType.Video or
+                MessageType.VideoNote or MessageType.Audio or MessageType.Voice or MessageType.Document or
+                MessageType.Sticker => MessageDataType.Media,
+                MessageType.Contact => MessageDataType.Contact,
+                _ => MessageDataType.Unknown
+            };
+        else
+            Type = firstOne.Type is MessageType.Photo or MessageType.Video or MessageType.Document or MessageType.Audio
+                ? MessageDataType.MediaAlbum
+                : MessageDataType.Unknown;
         MediaFiles = messages.Select(m => new Media(m)).ToArray();
         Text = text ?? firstOne.Text ?? firstOne.Caption;
         Contact = firstOne.Contact;

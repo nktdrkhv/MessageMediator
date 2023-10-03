@@ -1,13 +1,15 @@
 using System.ComponentModel.DataAnnotations.Schema;
 using MessageMediator.ProofOfConcept.Abstract;
 using MessageMediator.ProofOfConcept.Enums;
+using Microsoft.EntityFrameworkCore;
 
 namespace MessageMediator.ProofOfConcept.Entities;
 
 [Table("Invitation")]
+[Index(nameof(Code), IsUnique = true)]
 public class Invitation : ICreatedAt
 {
-    public int InvitationId { get; private set; }
+    public int Id { get; private set; }
 
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime? RedeemAt { get; set; }

@@ -28,23 +28,25 @@ public class WorkerService : UpdateWriterServiceAbs
 
     public override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        using (var scope = _scopeFactory.CreateScope())
-        {
-            var provider = scope.ServiceProvider;
-            var db = provider.GetRequiredService<BotDbContext>();
-            var conf = provider.GetRequiredService<IOptions<BotConfiguration>>().Value;
+        // using (var scope = _scopeFactory.CreateScope())
+        // {
+        //     var provider = scope.ServiceProvider;
+        //     var db = provider.GetRequiredService<BotDbContext>();
+        //     var conf = provider.GetRequiredService<IOptions<BotConfiguration>>().Value;
 
-            Updater.TryGetUserNumericStateKeeper("admin", out var keeper);
-            foreach (var adminId in conf.Administrators)
-            {
-                keeper!.SetState(adminId, 0);
-                var commandsScope = BotCommandScope.Chat(new ChatId(adminId));
-                await Updater.BotClient.SetMyCommandsAsync(new BotCommand[]
-                {
-                    new BotCommand() {Command = "test", Description = "Test description"}
-                }, scope: commandsScope, cancellationToken: stoppingToken);
-            }
-        }
+        //     Updater.TryGetUserNumericStateKeeper("admin", out var keeper);
+        //     foreach (var adminId in conf.Administrators)
+        //     {
+        //         keeper!.SetState(adminId, 0);
+        //         var commandsScope = BotCommandScope.Chat(new ChatId(adminId));
+        //         await Updater.BotClient.SetMyCommandsAsync(new BotCommand[]
+        //         {
+        //             new BotCommand() {Command = "sources", Description = "Источники задач"},
+        //             new BotCommand() {Command = "workers", Description = "Исполнители"},
+        //             new BotCommand() {Command = "supervisors", Description = "Проверяющие"}
+        //         }, scope: commandsScope, cancellationToken: stoppingToken);
+        //     }
+        // }
 
         while (!stoppingToken.IsCancellationRequested)
         {

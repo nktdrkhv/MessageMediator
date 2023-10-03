@@ -6,7 +6,7 @@ namespace MessageMediator.ProofOfConcept.Entities;
 [Table("Chain")]
 public class Chain : ICreatedAt
 {
-    public int ChainId { get; private set; }
+    public int Id { get; private set; }
     public DateTime CreatedAt { get; private set; } = DateTime.UtcNow;
     public DateTime? FinishedAt { get; set; }
 

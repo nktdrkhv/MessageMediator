@@ -8,7 +8,7 @@ namespace MessageMediator.ProofOfConcept.Entities;
 [Table("Media")]
 public class Media
 {
-    public int MediaId { get; private set; }
+    public int Id { get; private set; }
     public MediaType MediaType { get; private set; } = MediaType.None;
     public string? FileId { get; private set; }
     public string? FileUniqueId { get; private set; }
