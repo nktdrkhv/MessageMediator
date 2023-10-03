@@ -1,10 +1,11 @@
+using MessageMediator.ProofOfConcept.Configuration;
 using MessageMediator.ProofOfConcept.Entities;
+using MessageMediator.ProofOfConcept.Extensions;
 using MessageMediator.ProofOfConcept.Persistance;
+using Microsoft.Extensions.Options;
 using Telegram.Bot;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
-using TelegramUpdater.FilterAttributes.Attributes;
-using TelegramUpdater.Filters;
 using TelegramUpdater.UpdateContainer;
 using TelegramUpdater.UpdateHandlers.Scoped;
 using TelegramUpdater.UpdateHandlers.Scoped.ReadyToUse;
@@ -15,37 +16,54 @@ namespace MessageMediator.ProofOfConcept.UpdateHandlers.MyChatMembers;
 public sealed class SelfBlockDetection : MyChatMemberHandler
 {
     private readonly BotDbContext _context;
+    private readonly BotConfiguration _conf;
 
-    public SelfBlockDetection(BotDbContext context) => _context = context;
+    public SelfBlockDetection(BotDbContext context, IOptions<BotConfiguration> options)
+    {
+        _context = context;
+        _conf = options.Value;
+    }
 
     protected async override Task HandleAsync(IContainer<ChatMemberUpdated> cntr)
     {
         var chat = await _context.LocalChats.FindAsync(cntr.Update.Chat.Id);
-        if (chat == null)
+        if (chat == null &&
+            cntr.Update.NewChatMember.Status == ChatMemberStatus.Member &&
+            cntr.Update.Chat.Type is ChatType.Group or ChatType.Supergroup or ChatType.Channel)
         {
-            if (cntr.Update.Chat.Type is not ChatType.Group or ChatType.Supergroup or ChatType.Channel)
-                StopPropagation();
             var localChat = new LocalChat(cntr.Update.Chat);
             await _context.LocalChats.AddAsync(localChat);
             await _context.SaveChangesAsync();
+
+            foreach (var adminId in _conf.Administrators)
+                await cntr.BotClient.SendChatRegistrationNotificationAsync(adminId, localChat);
+
             StopPropagation();
         }
+        else if (chat == null)
+            StopPropagation();
 
         if (cntr.Update.NewChatMember.Status == ChatMemberStatus.Member)
         {
             chat!.IsSelfBlocked = true;
             await UserBlock(chat, true);
+
+            foreach (var adminId in _conf.Administrators)
+                await cntr.BotClient.SendChatUnblockedNotificationAsync(adminId, chat);
         }
         else if (cntr.Update.NewChatMember.Status is ChatMemberStatus.Left or ChatMemberStatus.Kicked)
         {
             chat!.IsSelfBlocked = false;
             await UserBlock(chat, false);
+
+            foreach (var adminId in _conf.Administrators)
+                await cntr.BotClient.SendChatBlockedNotificationAsync(adminId, chat);
         }
 
         await _context.SaveChangesAsync();
     }
 
-    private async Task UserBlock(LocalChat chat, bool doBlock)
+    private async ValueTask UserBlock(LocalChat chat, bool doBlock)
     {
         if (chat.ChatType != ChatType.Private)
             return;

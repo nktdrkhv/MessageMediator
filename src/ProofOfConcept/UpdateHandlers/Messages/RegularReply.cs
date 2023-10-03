@@ -9,7 +9,7 @@ using TelegramUpdater.UpdateHandlers.Scoped.ReadyToUse;
 
 namespace MessageMediator.ProofOfConcept.UpdateHandlers.Messages;
 
-[Order(11), Replied]
+[Order(101), Replied]
 public sealed class RegularReply : MessageHandler
 {
     private readonly BotDbContext _context;

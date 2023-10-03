@@ -9,7 +9,7 @@ using TelegramUpdater.UpdateHandlers.Scoped.ReadyToUse;
 
 namespace MessageMediator.ProofOfConcept.UpdateHandlers.CallbackQueries;
 
-[Order(10)]
+[Order(100)]
 public sealed class RegularReaction : CallbackQueryHandler
 {
     private readonly BotDbContext _context;

@@ -8,6 +8,7 @@ namespace MessageMediator.ProofOfConcept.Entities;
 public class Trigger
 {
     public int TriggerId { get; private set; }
+    public string? Label { get; set; }
 
     public string Text { get; set; } = null!;
     public MessageEntityType Type { get; set; }

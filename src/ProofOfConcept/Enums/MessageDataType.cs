@@ -4,6 +4,7 @@ public enum MessageDataType
 {
     Text,
     Media,
-    Geolocation,
-    Contact
+    //Geolocation,
+    Contact,
+    Unknown,
 }

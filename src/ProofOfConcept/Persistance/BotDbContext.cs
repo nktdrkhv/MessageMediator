@@ -23,7 +23,7 @@ public class BotDbContext : DbContext
 
     public BotDbContext()
     {
-        Database.EnsureDeleted();
+        //Database.EnsureDeleted();
         Database.EnsureCreated();
     }
 
