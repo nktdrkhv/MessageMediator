@@ -5,8 +5,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace MessageMediator.ProofOfConcept.Entities;
 
-[Table("Invitation")]
-[Index(nameof(Code), IsUnique = true)]
+[Table("Invitation"), Index(nameof(Code), IsUnique = true)]
 public class Invitation : ICreatedAt
 {
     public int Id { get; private set; }
@@ -14,9 +13,10 @@ public class Invitation : ICreatedAt
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime? RedeemAt { get; set; }
 
+    public int TriggerId { get; set; }
+    public Trigger Trigger { get; set; } = null!;
+
     public InvitationTarget Target { get; set; }
     public string Code { get; set; } = Guid.NewGuid().ToString()[..7];
-
-    public int? TriggerId { get; set; }
-    public Trigger? Trigger { get; set; } = null!;
+    public string? NewAlias { get; set; }
 }

@@ -53,7 +53,11 @@ public static class TelegramBotClientExtensions
         }
 
         var text = sb.Length > 0 ? sb.ToString() : null;
-        var msg = await client.SendMessageDataAsync(chain.Worker!.ChatId, null, text, chain.PreparedData);
+
+        var markup = new InlineKeyboardMarkup(
+            InlineKeyboardButton.WithCallbackData("Взять в работу", $"take:{chain.Id}"));
+
+        var msg = await client.SendMessageDataAsync(chain.Worker!.ChatId, null, text, chain.PreparedData, markup);
         return new LocalMessage(text, msg);
     }
 

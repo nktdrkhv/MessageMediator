@@ -8,6 +8,7 @@ public class Chain : ICreatedAt
 {
     public int Id { get; private set; }
     public DateTime CreatedAt { get; private set; } = DateTime.UtcNow;
+    public DateTime? TookAt { get; set; }
     public DateTime? FinishedAt { get; set; }
 
     public int TriggerId { get; set; }

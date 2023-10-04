@@ -18,4 +18,17 @@ public static class DbContextExtensions
             return newUser;
         }
     }
+
+    public static async ValueTask<LocalChat> GetOrCreateLocalChatAsync(this BotDbContext context, Chat chat)
+    {
+        if (await context.LocalChats.FindAsync(chat.Id) is LocalChat localChat)
+            return localChat;
+        else
+        {
+            var newChat = new LocalChat(chat);
+            await context.LocalChats.AddAsync(newChat);
+            await context.SaveChangesAsync();
+            return newChat;
+        }
+    }
 }

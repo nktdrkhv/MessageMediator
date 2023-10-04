@@ -111,6 +111,8 @@ public sealed class RegularIssue : MessageHandler
             // ----------- broadcasting ----------
             // -----------------------------------
 
+            using var transaction = _context.Database.BeginTransaction();
+
             foreach (var match in matches)
             {
                 var trigger = _context.Triggers
@@ -154,6 +156,8 @@ public sealed class RegularIssue : MessageHandler
                 };
                 await _context.ChainLinks.AddAsync(chainLink);
                 await _context.SaveChangesAsync();
+
+                transaction.Commit();
 
                 // -----------------------------------
                 // ---------- admins notify ----------

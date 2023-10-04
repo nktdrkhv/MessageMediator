@@ -14,13 +14,10 @@ public sealed class RegularReply : MessageHandler
 {
     private readonly BotDbContext _context;
 
-    public RegularReply(BotDbContext context)
-    {
-        _context = context;
-    }
+    public RegularReply(BotDbContext context) => _context = context;
 
     protected override Task HandleAsync(IContainer<Message> cntr)
     {
-        throw new NotImplementedException();
+        throw new Exception();
     }
 }
