@@ -14,13 +14,12 @@ public sealed class RegularReaction : CallbackQueryHandler
 {
     private readonly BotDbContext _context;
 
-    public RegularReaction(BotDbContext context)
-    {
-        _context = context;
-    }
+    public RegularReaction(BotDbContext context) => _context = context;
 
     protected override Task HandleAsync(IContainer<CallbackQuery> cntr)
     {
+        // approve - reject
+        // accept - decline
         throw new NotImplementedException();
     }
 }

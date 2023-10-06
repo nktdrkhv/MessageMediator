@@ -1,5 +1,7 @@
 using MessageMediator.ProofOfConcept.Entities;
 using MessageMediator.ProofOfConcept.Persistance;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Telegram.Bot.Types;
 
 namespace MessageMediator.ProofOfConcept.Extensions;
@@ -31,4 +33,12 @@ public static class DbContextExtensions
             return newChat;
         }
     }
+
+    public static IQueryable<ChainLink> IncludeMainChainParts(this IQueryable<ChainLink> query) => query
+            .Include(cl => cl.MotherChain.SourceChat)
+            .Include(cl => cl.MotherChain.Worker)
+            .Include(cl => cl.MotherChain.Supervisor)
+            .Include(cl => cl.ForwardMessage)
+            .Include(cl => cl.RecievedMessage)
+            .AsSplitQuery();
 }

@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations.Schema;
 using MessageMediator.ProofOfConcept.Abstract;
+using Microsoft.EntityFrameworkCore.Query.Internal;
 using Telegram.Bot.Types;
 
 namespace MessageMediator.ProofOfConcept.Entities;
@@ -8,26 +9,32 @@ namespace MessageMediator.ProofOfConcept.Entities;
 public class LocalMessage : ICreatedAt
 {
     public int Id { get; private set; }
-    public int TelegramMessageId { get; set; }
+    public int TelegramMessageId { get; private set; }
     public DateTime CreatedAt { get; private set; } = DateTime.UtcNow;
 
     public long ChatId { get; set; }
-    public LocalChat Chat { get; set; } = null!;
-
     public long? UserId { get; set; }
+    public LocalChat Chat { get; set; } = null!;
     public LocalUser? User { get; set; }
 
     public int DataId { get; set; }
     public MessageData Data { get; set; } = null!;
 
-    public LocalMessage(string? text, params Message[] messages)
+    public LocalMessage(string? customText, Message message)
     {
-        var firstOne = messages.First();
-        TelegramMessageId = firstOne.MessageId;
-        ChatId = firstOne.Chat.Id;
-        UserId = firstOne.From?.Id;
-        Data = new MessageData(text, messages);
+        TelegramMessageId = message.MessageId;
+        ChatId = message.Chat.Id;
+        UserId = message.From?.Id;
+        Data = new MessageData(customText, message);
     }
 
     private LocalMessage() { }
+
+    public static ICollection<LocalMessage> FromSet(string? customText, params Message[] messages)
+    {
+        var locals = new List<LocalMessage> { new LocalMessage(customText, messages.First()) };
+        foreach (var msg in messages.Skip(1))
+            locals.Add(new(null, msg));
+        return locals;
+    }
 }

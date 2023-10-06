@@ -53,8 +53,8 @@ public class Media
 
         if (MediaType != MediaType.None && MediaType != converted)
             return;
-
-        MediaType = converted;
+        else
+            MediaType = converted;
 
         switch (message.Type)
         {

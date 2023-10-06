@@ -34,6 +34,4 @@ IHost host = Host.CreateDefaultBuilder(args)
     })
     .Build();
 
-//using var db = host.Services.CreateScope().ServiceProvider.GetRequiredService<BotDbContext>();
-
 host.Run();

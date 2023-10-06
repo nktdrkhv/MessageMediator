@@ -10,17 +10,17 @@ namespace MessageMediator.ProofOfConcept.Entities;
 public class MessageData
 {
     public int Id { get; private set; }
-    public MessageDataType Type { get; set; }
+    public string? MediaGroupId { get; private set; }
+    public MessageDataType Type { get; private set; }
 
     public string? Text { get; set; }
-    public ICollection<Media>? MediaFiles { get; set; }
+    public Media? Media { get; set; }
     public Contact? Contact { get; set; }
 
-    public MessageData(string? text, params Message[] messages)
+    public MessageData(string? text, Message message)
     {
-        var firstOne = messages.First();
-        if (messages.Length == 1)
-            Type = firstOne.Type switch
+        if (message.MediaGroupId == null)
+            Type = message.Type switch
             {
                 MessageType.Text => MessageDataType.Text,
                 MessageType.Photo or MessageType.Animation or MessageType.Photo or MessageType.Video or
@@ -30,19 +30,24 @@ public class MessageData
                 _ => MessageDataType.Unknown
             };
         else
-            Type = firstOne.Type is MessageType.Photo or MessageType.Video or MessageType.Document or MessageType.Audio
-                ? MessageDataType.MediaAlbum
-                : MessageDataType.Unknown;
-        MediaFiles = messages.Select(m => new Media(m)).ToArray();
-        Text = text ?? firstOne.Text ?? firstOne.Caption;
-        Contact = firstOne.Contact;
+        {
+            Type = message.Type is MessageType.Photo or MessageType.Video or MessageType.Document or MessageType.Audio
+                        ? MessageDataType.MediaAlbum
+                        : MessageDataType.Unknown;
+            MediaGroupId = message.MediaGroupId;
+        }
+
+        Media = new Media(message);
+        Text = text ?? message.Text ?? message.Caption;
+        Contact = message.Contact;
     }
 
     public MessageData(MessageData data)
     {
         Type = data.Type;
+        MediaGroupId = data.MediaGroupId;
         Text = data.Text;
-        MediaFiles = data.MediaFiles;
+        Media = data.Media;
         Contact = data.Contact;
     }
 

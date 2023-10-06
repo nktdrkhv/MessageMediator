@@ -37,13 +37,9 @@ public class BotDbContext : DbContext
             .Navigation(lm => lm.Data).AutoInclude();
 
         modelBuilder.Entity<MessageData>()
-            .Navigation(md => md.MediaFiles).AutoInclude();
+            .Navigation(md => md.Media).AutoInclude();
         modelBuilder.Entity<MessageData>()
             .Navigation(md => md.Contact).AutoInclude();
-        modelBuilder.Entity<MessageData>()
-            .HasMany(md => md.MediaFiles)
-                .WithMany()
-                .UsingEntity(join => join.ToTable("IncludedMedia"));
 
         modelBuilder.Entity<Contact>()
             .Property(typeof(int), "Id")

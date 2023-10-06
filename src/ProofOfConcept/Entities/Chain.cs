@@ -14,17 +14,14 @@ public class Chain : ICreatedAt
     public int TriggerId { get; set; }
     public Trigger Trigger { get; set; } = null!;
 
-    public int? WorkerId { get; set; }
-    public Worker? Worker { get; set; }
+    public long SourceChatId { get; set; }
+    public LocalChat SourceChat { get; set; } = null!;
 
+    public int? WorkerId { get; set; }
     public int? SupervisorId { get; set; }
+    public Worker? Worker { get; set; }
     public Supervisor? Supervisor { get; set; }
 
-    public int ReasonId { get; set; }
-    public LocalMessage Reason { get; set; } = null!;
-
-    public int PreparedDataId { get; set; }
-    public MessageData PreparedData { get; set; } = null!;
-
+    public ICollection<MessageData> PreparedData { get; set; } = null!;
     public ICollection<ChainLink>? Links { get; set; }
 }
