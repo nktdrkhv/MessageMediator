@@ -1,6 +1,7 @@
 using MessageMediator.ProofOfConcept;
 using MessageMediator.ProofOfConcept.Configuration;
 using MessageMediator.ProofOfConcept.Persistance;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Telegram.Bot;
 using Telegram.Bot.Types.Enums;
@@ -26,10 +27,14 @@ IHost host = Host.CreateDefaultBuilder(args)
                 maxDegreeOfParallelism: 32,
                 flushUpdatesQueue: true,
                 allowedUpdates: Array.Empty<UpdateType>()),
-            (builder) => builder
+            builder => builder
                 .AutoCollectScopedHandlers()
                 .AddDefaultExceptionHandler());
-        services.AddDbContext<BotDbContext>();
+        services.AddDbContext<BotDbContext>(options =>
+        {
+            var connection = context.Configuration.GetConnectionString("SQLite");
+            options.UseSqlite(connection);
+        });
         services.AddHostedService<WorkerService>();
     })
     .Build();

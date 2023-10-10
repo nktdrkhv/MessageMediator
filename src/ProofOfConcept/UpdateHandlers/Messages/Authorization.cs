@@ -2,8 +2,9 @@ using MessageMediator.ProofOfConcept.Entities;
 using MessageMediator.ProofOfConcept.Extensions;
 using MessageMediator.ProofOfConcept.Persistance;
 using MessageMediator.ProofOfConcept.Enums;
+
 using Telegram.Bot.Types;
-using Telegram.Bot.Types.Enums;
+
 using TelegramUpdater.FilterAttributes.Attributes;
 using TelegramUpdater.Filters;
 using TelegramUpdater.Helpers;
@@ -23,10 +24,10 @@ public sealed class Authorization : MessageHandler
     protected override async Task HandleAsync(IContainer<Message> cntr)
     {
         if (cntr.TryParseCommandArgs(out string? args) &&
-            args != null &&
-            _context.Invitations
-                .Where(i => i.Code == args && i.RedeemAt == null)
-                .SingleOrDefault() is Invitation invitation)
+            string.IsNullOrWhiteSpace(args) &&
+            _context.Invitations.SingleOrDefault(
+                i => i.Code == args
+                     && i.RedeemAt == null) is Invitation invitation)
         {
             var user = await _context.GetOrCreateLocalUserAsync(cntr.Sender()!);
             invitation.RedeemAt = DateTime.UtcNow;
@@ -34,53 +35,45 @@ public sealed class Authorization : MessageHandler
             {
                 case InvitationTarget.SourceRole:
                     var sourceChat = await _context.GetOrCreateLocalChatAsync(cntr.Update.Chat);
-                    await _context.Entry(sourceChat)
-                        .Collection(lc => lc.SourcingFor!)
-                        .LoadAsync();
-                    await _context.Entry(invitation)
-                        .Reference(i => i.Trigger.Source)
-                        .LoadAsync();
-                    if (!sourceChat.SourcingFor!.Any(s => s.Id == invitation.Trigger.SourceId))
+                    await _context.Entry(sourceChat).Collection(lc => lc.SourcingFor!).LoadAsync();
+                    await _context.Entry(invitation).Reference(i => i.Trigger.Source).LoadAsync();
+                    if (sourceChat.SourcingFor!.All(s => s.Id != invitation.Trigger.SourceId))
                     {
                         sourceChat.SourcingFor!.Add(invitation.Trigger.Source);
                         _context.LocalChats.Add(sourceChat);
                     }
+
                     break;
                 case InvitationTarget.WorkerRole:
                     var workerChat = await _context.GetOrCreateLocalChatAsync(cntr.Update.Chat);
-                    if (_context.Workers
-                            .Where(w =>
-                                w.TriggerId == invitation.TriggerId &&
-                                w.ChatId == workerChat.Id)
-                            .SingleOrDefault() == null)
+                    if (_context.Workers.SingleOrDefault(
+                            w => w.TriggerId == invitation.TriggerId &&
+                                 w.ChatId == workerChat.Id) == null)
                     {
-                        var worker = new Worker()
+                        var worker = new Worker
                         {
-                            TriggerId = invitation.TriggerId,
-                            Chat = workerChat,
-                            Alias = invitation.NewAlias
+                            TriggerId = invitation.TriggerId, Chat = workerChat, Alias = invitation.NewAlias
                         };
                         _context.Workers.Add(worker);
                     }
+
                     break;
                 case InvitationTarget.SupervisorRole:
                     var supervisorChat = await _context.GetOrCreateLocalChatAsync(cntr.Update.Chat);
-                    if (_context.Supervisors
-                            .Where(s =>
-                                s.TriggerId == invitation.TriggerId &&
-                                s.ChatId == supervisorChat.Id)
-                            .SingleOrDefault() == null)
+                    if (_context.Supervisors.SingleOrDefault(
+                            s => s.TriggerId == invitation.TriggerId &&
+                                 s.ChatId == supervisorChat.Id) == null)
                     {
                         var supervisor = new Supervisor()
                         {
-                            TriggerId = invitation.TriggerId,
-                            Chat = supervisorChat,
-                            Alias = invitation.NewAlias
+                            TriggerId = invitation.TriggerId, Chat = supervisorChat, Alias = invitation.NewAlias
                         };
                         _context.Supervisors.Add(supervisor);
                     }
+
                     break;
             }
+
             await _context.SaveChangesAsync();
         }
         else
@@ -88,6 +81,7 @@ public sealed class Authorization : MessageHandler
             await _context.GetOrCreateLocalUserAsync(cntr.Sender()!);
             await cntr.ResponseAsync("Мы любим любопытных");
         }
+
         StopPropagation();
     }
 }

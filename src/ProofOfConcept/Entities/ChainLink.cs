@@ -26,14 +26,22 @@ public class ChainLink : ICreatedAt
     public TrineRole RoleOfSender => RoleOf(RecievedMessage);
     public TrineRole RoleOfAddressee => RoleOf(ForwardMessage);
 
-    public TrineRole RoleOf(LocalMessage localMessage)
+    public TrineRole RoleOf(LocalMessage localMessage) => RoleOf(localMessage.ChatId);
+
+    public TrineRole RoleOf(long chatId)
     {
-        if (localMessage.ChatId == MotherChain.SourceChatId)
+        if (chatId == MotherChain.SourceChatId)
             return TrineRole.Source;
-        if (localMessage.ChatId == MotherChain.Worker!.ChatId)
+        if (chatId == MotherChain.Worker!.ChatId)
             return TrineRole.Worker;
-        if (localMessage.ChatId == MotherChain.Supervisor?.ChatId)
+        if (chatId == MotherChain.Supervisor?.ChatId)
             return TrineRole.Supervisor;
         return TrineRole.None;
     }
+
+    public LocalMessage TwinOf(int telegramMessageId) => RecievedMessage.TelegramMessageId == telegramMessageId ?
+                                                        RecievedMessage :
+                                                        ForwardMessage.TelegramMessageId == telegramMessageId ?
+                                                        ForwardMessage :
+                                                        throw new ArgumentException("Submitted Telegram message ID are not a part of the chain link.");
 }

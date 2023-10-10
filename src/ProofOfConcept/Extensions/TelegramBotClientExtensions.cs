@@ -58,7 +58,7 @@ public static class TelegramBotClientExtensions
             InlineKeyboardButton.WithCallbackData("Взять в работу", $"take:{chain.Id}"));
 
         var messages = await client.SendMessageDataAsync(chain.Worker!.ChatId, null, customText, chain.PreparedData, markup);
-        return messages.OrderBy(m => m.MessageId).Select((m, _) => new LocalMessage(null, m)).ToArray();
+        return messages.OrderBy(m => m.MessageId).Select((m, _) => new LocalMessage(m)).ToArray();
     }
 
     public static async ValueTask<ICollection<Message>> SendMessageDataAsync(this ITelegramBotClient client, long chatId, int? replyTo, string? customText, ICollection<MessageData> dataCollection, IReplyMarkup? markup = null, bool protect = true)

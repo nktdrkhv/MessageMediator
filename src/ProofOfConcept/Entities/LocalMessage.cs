@@ -20,6 +20,8 @@ public class LocalMessage : ICreatedAt
     public int DataId { get; set; }
     public MessageData Data { get; set; } = null!;
 
+    public LocalMessage(Message message) : this(null, message) { }
+
     public LocalMessage(string? customText, Message message)
     {
         TelegramMessageId = message.MessageId;

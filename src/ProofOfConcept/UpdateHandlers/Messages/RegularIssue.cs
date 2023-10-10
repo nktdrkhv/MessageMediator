@@ -4,11 +4,14 @@ using MessageMediator.ProofOfConcept.Entities;
 using MessageMediator.ProofOfConcept.Enums;
 using MessageMediator.ProofOfConcept.Extensions;
 using MessageMediator.ProofOfConcept.Persistance;
+
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
+
 using Telegram.Bot;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
+
 using TelegramUpdater.UpdateContainer;
 using TelegramUpdater.UpdateHandlers.Scoped;
 using TelegramUpdater.UpdateHandlers.Scoped.ReadyToUse;
@@ -43,10 +46,7 @@ public sealed class RegularIssue : MessageHandler
             (first, second) => new OriginalEntity
             {
                 // warning: only for hashtags #, mentions @ etc.
-                Text = second[1..],
-                Type = first.Type,
-                Offset = first.Offset,
-                Length = first.Length
+                Text = second[1..], Type = first.Type, Offset = first.Offset, Length = first.Length
             });
         if (entities == null)
             return;
@@ -56,23 +56,20 @@ public sealed class RegularIssue : MessageHandler
         // -----------------------------------
 
         if (await _context.LocalChats.Where(lc => lc.Id == cntr.Update.Chat.Id)
-            .AsSplitQuery()
-            .Include(lc => lc.DecisionMakers)
-            .Include(lc => lc.SourcingFor)
-            .SingleOrDefaultAsync() is LocalChat chat)
+                .AsSplitQuery()
+                .Include(lc => lc.DecisionMakers)
+                .Include(lc => lc.SourcingFor)
+                .SingleOrDefaultAsync() is LocalChat chat)
         {
             var matchesQuery = from s in chat.SourcingFor!.AsQueryable()
-                               join t in _context.Triggers on s.Id equals t.SourceId
-                               join e in entities!.AsQueryable() on t.Type equals e.Type
-                               where t.Text == e.Text
-                               where !s.IsDisabled && !s.IsDeleted && !t.IsDisabled
-                               select new MatchedTrigger
-                               {
-                                   TriggerId = t.Id,
-                                   Behaviour = t.Behaviour,
-                                   Offset = e.Offset,
-                                   Length = e.Length
-                               };
+                join t in _context.Triggers on s.Id equals t.SourceId
+                join e in entities.AsQueryable() on t.Type equals e.Type
+                where t.Text == e.Text
+                where !s.IsDisabled && !s.IsDeleted && !t.IsDisabled
+                select new MatchedTrigger
+                {
+                    TriggerId = t.Id, Behaviour = t.Behaviour, Offset = e.Offset, Length = e.Length
+                };
             var matches = await matchesQuery.ToArrayAsync();
             if (!matches.Any())
                 return;
@@ -106,9 +103,9 @@ public sealed class RegularIssue : MessageHandler
             {
                 List<Message> messageGroup = new() { cntr.Update };
                 while (await AwaitMessageAsync(
-                    filter: null,
-                    timeOut: TimeSpan.FromSeconds(1)) is IContainer<Message> msgCntr &&
-                            mediaGroup.Equals(msgCntr.Update.MediaGroupId))
+                           filter: null,
+                           timeOut: TimeSpan.FromSeconds(1)) is IContainer<Message> msgCntr &&
+                       mediaGroup.Equals(msgCntr.Update.MediaGroupId))
                     messageGroup.Add(msgCntr.Update);
                 reasons = LocalMessage.FromSet(text, messageGroup.OrderBy(m => m.MessageId).ToArray());
             }
@@ -119,7 +116,7 @@ public sealed class RegularIssue : MessageHandler
             // ----------- broadcasting ----------
             // -----------------------------------
 
-            using var transaction = _context.Database.BeginTransaction();
+            await using var transaction = await _context.Database.BeginTransactionAsync();
 
             foreach (var match in matches)
             {
@@ -129,8 +126,8 @@ public sealed class RegularIssue : MessageHandler
                     .Include(t => t.Workers)
                     .Include(t => t.Supervisors)
                     .Single();
-                var worker = trigger.Workers.First(w => !w.IsDisabled && !w.IsDeleted);
-                var supervisor = trigger.Supervisors!.FirstOrDefault(s => !s.IsDisabled && !s.IsDeleted);
+                var worker = trigger.Workers.First(w => w is { IsDisabled: false, IsDeleted: false });
+                var supervisor = trigger.Supervisors!.FirstOrDefault(s => s is { IsDisabled: false, IsDeleted: false });
 
                 // -------- poining the data ---------
                 var extractingText = (MessageData data) => new MessageData(data)
@@ -145,16 +142,16 @@ public sealed class RegularIssue : MessageHandler
                         _ => throw new NotImplementedException()
                     }
                 };
-                var concreteData = new List<MessageData>() { extractingText(reasons.First().Data) };
+                var concreteData = new List<MessageData> { extractingText(reasons.First().Data) };
                 foreach (var reason in reasons.Skip(1))
                     concreteData.Add(reason.Data);
                 // -----------------------------------
 
-                var chain = new Chain()
+                var chain = new Chain
                 {
                     Trigger = trigger,
                     SourceChat = chat,
-                    Worker = worker!,
+                    Worker = worker,
                     Supervisor = supervisor,
                     PreparedData = concreteData
                 };
@@ -162,15 +159,13 @@ public sealed class RegularIssue : MessageHandler
                 await _context.SaveChangesAsync();
 
                 foreach (var reason in reasons.Zip(await cntr.BotClient.SendIssueAsync(chain)))
-                    await _context.ChainLinks.AddAsync(new ChainLink()
+                    await _context.ChainLinks.AddAsync(new ChainLink
                     {
-                        MotherChain = chain,
-                        RecievedMessage = reason.First,
-                        ForwardMessage = reason.Second
+                        MotherChain = chain, RecievedMessage = reason.First, ForwardMessage = reason.Second
                     });
                 await _context.SaveChangesAsync();
 
-                transaction.Commit();
+                await transaction.CommitAsync();
 
                 // -----------------------------------
                 // ---------- admins notify ----------
@@ -182,7 +177,8 @@ public sealed class RegularIssue : MessageHandler
 
                 foreach (var adminId in _conf.Administrators)
                     await cntr.BotClient.SendTextMessageAsync(adminId,
-                        text: $"Задача <b>{chain.Trigger.Label}</b>\nотправлена из <i>{sourceLabel}</i>\nисполнителю <i>{workerLabel}</i>",
+                        text:
+                        $"Задача <b>{triggerLabel}</b>\nотправлена из <i>{sourceLabel}</i>\nисполнителю <i>{workerLabel}</i>",
                         disableNotification: true,
                         parseMode: ParseMode.Html);
             }

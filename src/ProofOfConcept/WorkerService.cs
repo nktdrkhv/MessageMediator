@@ -1,10 +1,4 @@
-using MessageMediator.ProofOfConcept.Configuration;
-using MessageMediator.ProofOfConcept.Entities;
-using MessageMediator.ProofOfConcept.Persistance;
-using Microsoft.Extensions.Options;
-using Telegram.Bot;
 using Telegram.Bot.Polling;
-using Telegram.Bot.Types;
 using TelegramUpdater;
 using TelegramUpdater.Hosting;
 

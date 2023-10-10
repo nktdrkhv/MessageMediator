@@ -21,13 +21,11 @@ public class BotDbContext : DbContext
     public DbSet<Media> Media { get; set; } = null!;
     public DbSet<Contact> Contacts { get; set; } = null!;
 
-    public BotDbContext()
+    public BotDbContext(DbContextOptions<BotDbContext> options) : base(options)
     {
         // Database.EnsureDeleted();
         Database.EnsureCreated();
     }
-
-    protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder) => optionsBuilder.UseSqlite("Data Source=mm.db");
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
