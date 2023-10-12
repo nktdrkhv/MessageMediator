@@ -5,10 +5,12 @@ using MessageMediator.ProofOfConcept.Enums;
 namespace MessageMediator.ProofOfConcept.Entities;
 
 [Table("ChainLink")]
-public class ChainLink : ICreatedAt
+public class
+ChainLink : ICreatedAt
 {
     public int Id { get; private set; }
     public DateTime CreatedAt { get; private set; } = DateTime.UtcNow;
+    public ChainLinkMode Mode { get; set; } = ChainLinkMode.Normal;
 
     public int MotherChainId { get; set; }
     public Chain MotherChain { get; set; } = null!;
@@ -16,15 +18,27 @@ public class ChainLink : ICreatedAt
     public int RecievedMessageId { get; set; }
     public int ForwardMessageId { get; set; }
     public LocalMessage RecievedMessage { get; set; } = null!;
-    public LocalMessage ForwardMessage { get; set; } = null!;
+    public LocalMessage ForwardedMessage { get; set; } = null!;
+
+    public ChainLink() { }
+
+    public ChainLink(Chain motherChain, LocalMessage recievedMessage, LocalMessage forwardedMessage, LocalMessage? repliedMessage = null)
+    {
+        MotherChain = motherChain;
+        RecievedMessage = recievedMessage;
+        ForwardedMessage = forwardedMessage;
+
+        recievedMessage.ReferenceTo = repliedMessage;
+        forwardedMessage.ReferenceTo = recievedMessage;
+    }
 
     public bool IsBelongTo(long chatId) =>
-                (MotherChain.SourceChatId == chatId) ||
-                (MotherChain.Worker!.ChatId == chatId) ||
-                (MotherChain.Supervisor?.ChatId == chatId);
+        (MotherChain.SourceChatId == chatId) ||
+        (MotherChain.Worker!.ChatId == chatId) ||
+        (MotherChain.Supervisor?.ChatId == chatId);
 
     public TrineRole RoleOfSender => RoleOf(RecievedMessage);
-    public TrineRole RoleOfAddressee => RoleOf(ForwardMessage);
+    public TrineRole RoleOfAddressee => RoleOf(ForwardedMessage);
 
     public TrineRole RoleOf(LocalMessage localMessage) => RoleOf(localMessage.ChatId);
 
@@ -39,9 +53,10 @@ public class ChainLink : ICreatedAt
         return TrineRole.None;
     }
 
-    public LocalMessage TwinOf(int telegramMessageId) => RecievedMessage.TelegramMessageId == telegramMessageId ?
-                                                        RecievedMessage :
-                                                        ForwardMessage.TelegramMessageId == telegramMessageId ?
-                                                        ForwardMessage :
-                                                        throw new ArgumentException("Submitted Telegram message ID are not a part of the chain link.");
+    public LocalMessage TwinOf(int telegramMessageId) =>
+        RecievedMessage.TelegramMessageId == telegramMessageId ?
+        ForwardedMessage :
+        ForwardedMessage.TelegramMessageId == telegramMessageId ?
+        RecievedMessage :
+        throw new ArgumentException("Submitted Telegram message ID are not a part of the chain link.");
 }

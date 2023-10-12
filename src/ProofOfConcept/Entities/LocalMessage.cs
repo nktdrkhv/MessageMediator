@@ -12,6 +12,9 @@ public class LocalMessage : ICreatedAt
     public int TelegramMessageId { get; private set; }
     public DateTime CreatedAt { get; private set; } = DateTime.UtcNow;
 
+    public int? ReferenceToId { get; set; }
+    public LocalMessage? ReferenceTo { get; set; }
+
     public long ChatId { get; set; }
     public long? UserId { get; set; }
     public LocalChat Chat { get; set; } = null!;

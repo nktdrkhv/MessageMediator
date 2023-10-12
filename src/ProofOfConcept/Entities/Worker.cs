@@ -6,5 +6,5 @@ namespace MessageMediator.ProofOfConcept.Entities;
 [Table("Worker")]
 public class Worker : ExecutorEntity
 {
-    public bool IsOnProbation { get; set; } = true;
+    public bool IsOnProbation { get; set; } = false;
 }

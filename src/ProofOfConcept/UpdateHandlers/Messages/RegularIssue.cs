@@ -4,14 +4,11 @@ using MessageMediator.ProofOfConcept.Entities;
 using MessageMediator.ProofOfConcept.Enums;
 using MessageMediator.ProofOfConcept.Extensions;
 using MessageMediator.ProofOfConcept.Persistance;
-
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
-
 using Telegram.Bot;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
-
 using TelegramUpdater.UpdateContainer;
 using TelegramUpdater.UpdateHandlers.Scoped;
 using TelegramUpdater.UpdateHandlers.Scoped.ReadyToUse;
@@ -46,7 +43,10 @@ public sealed class RegularIssue : MessageHandler
             (first, second) => new OriginalEntity
             {
                 // warning: only for hashtags #, mentions @ etc.
-                Text = second[1..], Type = first.Type, Offset = first.Offset, Length = first.Length
+                Text = second[1..],
+                Type = first.Type,
+                Offset = first.Offset,
+                Length = first.Length
             });
         if (entities == null)
             return;
@@ -61,14 +61,18 @@ public sealed class RegularIssue : MessageHandler
                 .Include(lc => lc.SourcingFor)
                 .SingleOrDefaultAsync() is LocalChat chat)
         {
-            var matchesQuery = from s in chat.SourcingFor!.AsQueryable()
+            var matchesQuery =
+                from s in chat.SourcingFor!.AsQueryable()
                 join t in _context.Triggers on s.Id equals t.SourceId
                 join e in entities.AsQueryable() on t.Type equals e.Type
                 where t.Text == e.Text
                 where !s.IsDisabled && !s.IsDeleted && !t.IsDisabled
                 select new MatchedTrigger
                 {
-                    TriggerId = t.Id, Behaviour = t.Behaviour, Offset = e.Offset, Length = e.Length
+                    TriggerId = t.Id,
+                    Behaviour = t.Behaviour,
+                    Offset = e.Offset,
+                    Length = e.Length
                 };
             var matches = await matchesQuery.ToArrayAsync();
             if (!matches.Any())
@@ -98,19 +102,18 @@ public sealed class RegularIssue : MessageHandler
             // ---------- preparing data ---------
             // -----------------------------------
 
-            ICollection<LocalMessage> reasons;
+            ICollection<LocalMessage> origialRecieved;
             if (cntr.Update.MediaGroupId is string mediaGroup)
             {
                 List<Message> messageGroup = new() { cntr.Update };
                 while (await AwaitMessageAsync(
-                           filter: null,
-                           timeOut: TimeSpan.FromSeconds(1)) is IContainer<Message> msgCntr &&
-                       mediaGroup.Equals(msgCntr.Update.MediaGroupId))
+                    filter: null,
+                    timeOut: TimeSpan.FromSeconds(1)) is IContainer<Message> msgCntr && mediaGroup.Equals(msgCntr.Update.MediaGroupId))
                     messageGroup.Add(msgCntr.Update);
-                reasons = LocalMessage.FromSet(text, messageGroup.OrderBy(m => m.MessageId).ToArray());
+                origialRecieved = LocalMessage.FromSet(text, messageGroup.OrderBy(m => m.MessageId).ToArray());
             }
             else
-                reasons = new LocalMessage[] { new(text, cntr.Update) };
+                origialRecieved = new LocalMessage[] { new(text, cntr.Update) };
 
             // -----------------------------------
             // ----------- broadcasting ----------
@@ -130,22 +133,9 @@ public sealed class RegularIssue : MessageHandler
                 var supervisor = trigger.Supervisors!.FirstOrDefault(s => s is { IsDisabled: false, IsDeleted: false });
 
                 // -------- poining the data ---------
-                var extractingText = (MessageData data) => new MessageData(data)
-                {
-                    // todo: check array boundaries
-                    Text = match.Behaviour switch
-                    {
-                        TriggerBehaviour.Full => text.Trim(),
-                        TriggerBehaviour.Before => text[..match.Offset].Trim(),
-                        TriggerBehaviour.Between => text[(match.Offset + match.Length)..(match.Next.Offset)].Trim(),
-                        TriggerBehaviour.After => text[(match.Offset + match.Length)..].Trim(),
-                        _ => throw new NotImplementedException()
-                    }
-                };
-                var concreteData = new List<MessageData> { extractingText(reasons.First().Data) };
-                foreach (var reason in reasons.Skip(1))
+                var concreteData = new List<MessageData> { ExtractText(origialRecieved.First().Data, text, match) };
+                foreach (var reason in origialRecieved.Skip(1))
                     concreteData.Add(reason.Data);
-                // -----------------------------------
 
                 var chain = new Chain
                 {
@@ -158,11 +148,25 @@ public sealed class RegularIssue : MessageHandler
                 await _context.Chains.AddAsync(chain);
                 await _context.SaveChangesAsync();
 
-                foreach (var reason in reasons.Zip(await cntr.BotClient.SendIssueAsync(chain)))
-                    await _context.ChainLinks.AddAsync(new ChainLink
-                    {
-                        MotherChain = chain, RecievedMessage = reason.First, ForwardMessage = reason.Second
-                    });
+                if (supervisor != null && worker.IsOnProbation)
+                {
+                    var sentToSupervisor = await cntr.BotClient.SendIssueToSupervisorAsync(chain);
+                    await _context.ChainLinks.AddRangeAsync(
+                        origialRecieved.Zip(sentToSupervisor).Select(
+                            (pair, _) => new ChainLink(chain, pair.First, pair.Second)));
+
+                    var sentToWorker = await cntr.BotClient.SendIssueToWorkerAsync(chain);
+                    await _context.ChainLinks.AddRangeAsync(
+                        sentToSupervisor.Zip(sentToWorker).Select(
+                            (pair, _) => new ChainLink(chain, pair.First, pair.Second)));
+                }
+                else
+                {
+                    var sentToWorker = await cntr.BotClient.SendIssueToWorkerAsync(chain);
+                    await _context.ChainLinks.AddRangeAsync(
+                        origialRecieved.Zip(sentToWorker).Select(
+                            (pair, _) => new ChainLink(chain, pair.First, pair.Second)));
+                }
                 await _context.SaveChangesAsync();
 
                 await transaction.CommitAsync();
@@ -184,4 +188,17 @@ public sealed class RegularIssue : MessageHandler
             }
         }
     }
+
+    public static MessageData ExtractText(MessageData data, string text, MatchedTrigger match) => new(data)
+    {
+        // todo: check array boundaries
+        Text = match.Behaviour switch
+        {
+            TriggerBehaviour.Full => text.Trim(),
+            TriggerBehaviour.Before => text[..match.Offset].Trim(),
+            TriggerBehaviour.Between => text[(match.Offset + match.Length)..match.Next.Offset].Trim(),
+            TriggerBehaviour.After => text[(match.Offset + match.Length)..].Trim(),
+            _ => throw new NotImplementedException()
+        }
+    };
 }

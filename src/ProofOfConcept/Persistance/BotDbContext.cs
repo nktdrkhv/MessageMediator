@@ -14,6 +14,7 @@ public class BotDbContext : DbContext
     public DbSet<Trigger> Triggers { get; set; } = null!;
     public DbSet<LocalChat> LocalChats { get; set; } = null!;
     public DbSet<LocalUser> LocalUsers { get; set; } = null!;
+    public DbSet<LocalMessage> LocalMessages { get; set; } = null!;
     public DbSet<Source> Sources { get; set; } = null!;
     public DbSet<Worker> Workers { get; set; } = null!;
     public DbSet<Supervisor> Supervisors { get; set; } = null!;

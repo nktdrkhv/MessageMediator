@@ -34,11 +34,12 @@ public static class DbContextExtensions
         }
     }
 
-    public static IQueryable<ChainLink> IncludeMainChainParts(this IQueryable<ChainLink> query) => query
+    public static IQueryable<ChainLink> IncludeChainLinkParts(this IQueryable<ChainLink> query) => query
             .Include(cl => cl.MotherChain.SourceChat)
             .Include(cl => cl.MotherChain.Worker)
             .Include(cl => cl.MotherChain.Supervisor)
-            .Include(cl => cl.ForwardMessage)
-            .Include(cl => cl.RecievedMessage)
+            .Include(cl => cl.MotherChain.Trigger.Source)
+            .Include(cl => cl.ForwardedMessage.ReferenceTo)
+            .Include(cl => cl.RecievedMessage.ReferenceTo)
             .AsSplitQuery();
 }

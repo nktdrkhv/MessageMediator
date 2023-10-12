@@ -1,4 +1,3 @@
-using System.Collections.Immutable;
 using System.Text;
 using MessageMediator.ProofOfConcept.Entities;
 using MessageMediator.ProofOfConcept.Enums;
@@ -38,26 +37,18 @@ public static class TelegramBotClientExtensions
                             parseMode: ParseMode.Html);
     }
 
-    public static async ValueTask<ICollection<LocalMessage>> SendIssueAsync(this ITelegramBotClient client, Chain chain)
+    public static async ValueTask<ICollection<LocalMessage>> SendIssueToWorkerAsync(this ITelegramBotClient client, Chain chain)
     {
-        var sb = new StringBuilder();
-
-        if (chain.Trigger.Source.Alias != null)
-            sb.AppendLine($"Задача от <b>{chain.Trigger.Source.Alias}</b>");
-        if (chain.Trigger.Label != null)
-            sb.AppendLine($"Тип: <b>{chain.Trigger.Label}</b>");
-        if (chain.PreparedData.First().Text != null)
-        {
-            if (sb.Length > 0)
-                sb.Append("\n\n");
-            sb.Append(chain.PreparedData.First().Text);
-        }
-
-        var customText = sb.Length > 0 ? sb.ToString() : null;
-        var markup = new InlineKeyboardMarkup(
-            InlineKeyboardButton.WithCallbackData("Взять в работу", $"take:{chain.Id}"));
-
+        var customText = chain.Trigger.Description(chain.PreparedData.First().Text);
+        var markup = InlineKeyboardMarkupWrapper.FullWorkerControls(chain.Id);
         var messages = await client.SendMessageDataAsync(chain.Worker!.ChatId, null, customText, chain.PreparedData, markup);
+        return messages.OrderBy(m => m.MessageId).Select((m, _) => new LocalMessage(m)).ToArray();
+    }
+
+    public static async ValueTask<ICollection<LocalMessage>> SendIssueToSupervisorAsync(this ITelegramBotClient client, Chain chain)
+    {
+        var customText = chain.Trigger.Description(chain.PreparedData.First().Text);
+        var messages = await client.SendMessageDataAsync(chain.Supervisor!.ChatId, null, customText, chain.PreparedData);
         return messages.OrderBy(m => m.MessageId).Select((m, _) => new LocalMessage(m)).ToArray();
     }
 
