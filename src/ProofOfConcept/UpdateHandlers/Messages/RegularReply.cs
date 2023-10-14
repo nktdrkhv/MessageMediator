@@ -1,8 +1,12 @@
+using MessageMediator.ProofOfConcept.Aggregates;
 using MessageMediator.ProofOfConcept.Entities;
 using MessageMediator.ProofOfConcept.Enums;
 using MessageMediator.ProofOfConcept.Extensions;
 using MessageMediator.ProofOfConcept.Persistance;
+using Microsoft.EntityFrameworkCore;
+using Telegram.Bot;
 using Telegram.Bot.Types;
+using Telegram.Bot.Types.Enums;
 using Telegram.Bot.Types.ReplyMarkups;
 using TelegramUpdater.FilterAttributes.Attributes;
 using TelegramUpdater.UpdateContainer;
@@ -22,117 +26,190 @@ public sealed class RegularReply : MessageHandler
     {
         var repliedTo = cntr.Update.ReplyToMessage!;
         var recieved = await RetrieveLocalMessageCollection(null, repliedTo);
+        ChainLink? chainLink = null;
 
-        var chainLink = _context.ChainLinks
-                .Where(cl =>
-                        (cl.ForwardedMessage.TelegramMessageId == repliedTo.MessageId && cl.ForwardedMessage.ChatId == repliedTo.Chat.Id) ||
-                        (cl.RecievedMessage.TelegramMessageId == repliedTo.MessageId && cl.RecievedMessage.ChatId == cntr.Update.Chat.Id))
+        try
+        {
+            chainLink = _context.ChainLinks
                 .Where(cl => cl.MotherChain.FinishedAt == null)
+                .Where(cl =>
+                    (cl.ForwardedMessage.TelegramMessageId == repliedTo.MessageId &&
+                        cl.ForwardedMessage.ChatId == repliedTo.Chat.Id) ||
+                    (cl.RecievedMessage.TelegramMessageId == repliedTo.MessageId &&
+                        cl.RecievedMessage.ChatId == repliedTo.Chat.Id))
+                .Where(cl =>
+                    !cl.Hide ||
+                    (cl.ForwardedMessage.ForceShow &&
+                        cl.ForwardedMessage.ChatId == repliedTo.Chat.Id) ||
+                    (cl.RecievedMessage.ForceShow &&
+                        cl.RecievedMessage.ChatId == repliedTo.Chat.Id))
                 .IncludeChainLinkParts()
                 .SingleOrDefault();
+        }
+        catch (InvalidOperationException)
+        {
+            await cntr.ResponseAsync("<i>Получатель неопределён</i>", parseMode: ParseMode.Html);
+            StopPropagation();
+        }
+
         if (chainLink == null)
             StopPropagation();
 
+        var roleOfSender = chainLink!.RoleOf(cntr.Update.Chat.Id);
         var address = chainLink!.TwinOf(repliedTo.MessageId);
-        var roleOfSender = chainLink.RoleOf(cntr.Update.Chat.Id);
+        var addresseeRole = chainLink.RoleOf(address);
 
-        // todo: wrap into an aggregate
-        long destinationChatId = address.ChatId;
-        int? destinationReplyTo = address.TelegramMessageId;
-        //string? customText = null;
-        IReplyMarkup? markup = null;
-        bool protect = true;
-
-        // ----------- role specific -----------
-
-        var adresseeRole = chainLink.RoleOf(address);
-
-        switch (adresseeRole)
+        switch (roleOfSender)
         {
             case TrineRole.Source:
+                if (addresseeRole is TrineRole.Worker)
+                {
+                    await CleanOldMarkups(cntr, chainLink.MotherChain, address.ChatId);
+                    var reply = new RepliedMessage
+                    {
+                        ReferenceLink = chainLink,
+                        DestinationMessage = address,
+                        ReplyItself = recieved,
+                        Markup = InlineKeyboardMarkupWrapper.OnlyQuestionControls(chainLink.MotherChainId)
+                    };
+                    await _context.ChainLinks.AddRangeAsync(await ForwardReplyMessage(cntr, reply));
+                    await _context.SaveChangesAsync();
+                }
+                else if (addresseeRole is TrineRole.Supervisor)
+                {
+                    // sending to a supervisor first
+                    await CleanOldMarkups(cntr, chainLink.MotherChain, address.ChatId);
+                    var customTextToSupervisor = recieved.First().Data.Text is string sourceText
+                        ? $"<i>Источник</i>\n\n{sourceText}".Trim()
+                        : "<i>Источник</i>";
+                    var replyToSupervisor = new RepliedMessage
+                    {
+                        ReferenceLink = chainLink,
+                        DestinationMessage = address,
+                        CustomText = customTextToSupervisor,
+                        ReplyItself = recieved,
+                        Markup = InlineKeyboardMarkupWrapper.FullSupervisorControls(chainLink.MotherChainId)
+                    };
+                    var supervisorLinks = await ForwardReplyMessage(cntr, replyToSupervisor);
+                    await _context.ChainLinks.AddRangeAsync(supervisorLinks);
+
+                    // resending to a worker then
+                    var workerChatId = chainLink.MotherChain.Worker!.ChatId;
+                    var workerDestination = address.ReferenceTo; // todo: explain explicitly 
+                    await CleanOldMarkups(cntr, chainLink.MotherChain, workerChatId);
+                    var replyToWorker = new RepliedMessage
+                    {
+                        ReferenceLinks = supervisorLinks,
+                        DestinationMessage = workerDestination!,
+                        ReplyItself = supervisorLinks.Select(sl => sl.ForwardedMessage),
+                        Markup = InlineKeyboardMarkupWrapper.OnlyQuestionControls(chainLink.MotherChainId)
+                    };
+                    await _context.ChainLinks.AddRangeAsync(await ForwardReplyMessage(cntr, replyToWorker));
+                    await _context.SaveChangesAsync();
+                }
+
                 break;
             case TrineRole.Worker:
-                break;
-            case TrineRole.Supervisor:
-                break;
-            default:
-                break;
-        }
-
-        if (roleOfSender is TrineRole.Worker)
-        {
-            if (chainLink.Mode is ChainLinkMode.Normal)
-                markup = adresseeRole switch
+                var workerMarkup = chainLink.Mode is ChainLinkMode.Normal ? addresseeRole switch
                 {
                     TrineRole.Source => InlineKeyboardMarkupWrapper.ReplyToSource(chainLink!.MotherChainId),
                     TrineRole.Supervisor => InlineKeyboardMarkupWrapper.ReplyToSupervisor(chainLink!.MotherChainId),
                     _ => null
+                } : null;
+                var workerCustomText = addresseeRole is TrineRole.Supervisor
+                    ? recieved.First().Data.Text is string workerText
+                        ? $"<i>Исполнитель</i>\n\n{workerText}".Trim()
+                        : "<i>Исполнитель</i>"
+                    : null;
+                var workerReply = new RepliedMessage
+                {
+                    ReferenceLink = chainLink,
+                    DestinationMessage = address,
+                    ReplyItself = recieved,
+                    CustomText = workerCustomText,
+                    Markup = workerMarkup,
                 };
-            await _context.ChainLinks.AddRangeAsync(await ForwardReplyMessage(cntr, chainLink, recieved, destinationChatId, destinationReplyTo, null, markup, protect));
+                await _context.ChainLinks.AddRangeAsync(await ForwardReplyMessage(cntr, workerReply));
+                await _context.SaveChangesAsync();
+                break;
+            case TrineRole.Supervisor:
+                IReplyMarkup? supervisorMarkup = null;
+                if (addresseeRole is TrineRole.Worker)
+                {
+                    supervisorMarkup = InlineKeyboardMarkupWrapper.OnlyQuestionControls(chainLink.MotherChainId);
+                    await CleanOldMarkups(cntr, chainLink.MotherChain, address.ChatId);
+                }
+                var supervisorReply = new RepliedMessage
+                {
+                    ReferenceLink = chainLink,
+                    DestinationMessage = address,
+                    ReplyItself = recieved,
+                    Markup = supervisorMarkup,
+                };
+                await _context.ChainLinks.AddRangeAsync(await ForwardReplyMessage(cntr, supervisorReply));
+                await _context.SaveChangesAsync();
+                break;
         }
-
-        if (roleOfSender is TrineRole.Source)
-        {
-
-            protect = false;
-        }
-
-        // -------------------------------------
-
-        // todo: sould BotClient.ForwardMessageAsync be better for Source and Supervisor messages?
-        var sentMessages = await cntr.BotClient.SendMessageDataAsync(
-            chatId: destinationChatId,
-            replyTo: destinationReplyTo,
-            customText: null,
-            recieved.Select(lm => lm.Data).ToArray(),
-            markup: markup,
-            protect: protect);
-
-        var links = sentMessages.Zip(recieved).Select((m, _) => new ChainLink()
-        {
-            Mode = chainLink.Mode,
-            MotherChain = chainLink.MotherChain,
-            RecievedMessage = m.Second,
-            ForwardedMessage = new LocalMessage(m.First)
-        });
-
-        await _context.ChainLinks.AddRangeAsync(links);
-        await _context.SaveChangesAsync();
-
         StopPropagation();
     }
 
-    private async ValueTask<ICollection<LocalMessage>> RetrieveLocalMessageCollection(string? text, Message message)
+    private async ValueTask<ICollection<LocalMessage>> RetrieveLocalMessageCollection(string? customText, Message firstMessage)
     {
-        if (message.MediaGroupId is string mediaGroup)
+        if (firstMessage.MediaGroupId is string mediaGroup)
         {
-            List<Message> messageGroup = new() { message };
+            List<Message> messageGroup = new() { firstMessage };
             while (await AwaitMessageAsync(
                        filter: null,
                        timeOut: TimeSpan.FromSeconds(1)) is IContainer<Message> msgCntr &&
                    mediaGroup.Equals(msgCntr.Update.MediaGroupId))
                 messageGroup.Add(msgCntr.Update);
-            return LocalMessage.FromSet(text, messageGroup.OrderBy(m => m.MessageId).ToArray());
+            return LocalMessage.FromSet(customText, messageGroup.OrderBy(m => m.MessageId).ToArray());
         }
         else
-            return new[] { new LocalMessage(text, message) };
+            return new[] { new LocalMessage(customText, firstMessage) };
     }
 
-    private async ValueTask<IEnumerable<ChainLink>> ForwardReplyMessage(IUpdateContainer cntr, ChainLink targetLink, IEnumerable<LocalMessage> reply, long chatId, int? replyTo, string? customText, IReplyMarkup? markup, bool protect = true)
+    private async ValueTask CleanOldMarkups(IUpdateContainer cntr, Chain chain, long chatId)
     {
-        var sentMessages = await cntr.BotClient.SendMessageDataAsync(
-            chatId: chatId,
-            replyTo: replyTo,
-            customText: customText,
-            dataCollection: reply.Select(lm => lm.Data).ToArray(),
-            markup: markup,
-            protect: protect);
-        return sentMessages.Zip(reply).Select((m, _) => new ChainLink()
+        var relativeMessages =
+            (from link in _context.ChainLinks.Include(cl => cl.ForwardedMessage)
+             where link.MotherChainId == chain.Id
+             where link.ForwardedMessage.ChatId == chatId
+             where link.ForwardedMessage.ActiveMarkup
+             select link.ForwardedMessage).ToArray();
+        for (int i = 0; i < relativeMessages.Length; i++)
         {
-            Mode = targetLink.Mode,
-            MotherChain = targetLink.MotherChain,
-            RecievedMessage = m.Second,
-            ForwardedMessage = new LocalMessage(m.First)
-        });
+            try
+            {
+                await cntr.BotClient.EditMessageReplyMarkupAsync(
+                    chatId: relativeMessages[i].ChatId,
+                    messageId: relativeMessages[i].TelegramMessageId,
+                    replyMarkup: InlineKeyboardMarkup.Empty()
+                );
+                relativeMessages[i].ActiveMarkup = false;
+            }
+            catch { }
+        }
+        await _context.SaveChangesAsync();
+    }
+
+    private static async ValueTask<IEnumerable<ChainLink>> ForwardReplyMessage(IUpdateContainer cntr, RepliedMessage repliedMessage)
+    {
+        // todo: sould BotClient.ForwardMessageAsync be better for Source and Supervisor messages?
+        var sentMessages = await cntr.BotClient.SendMessageDataAsync(
+            chatId: repliedMessage.DestinationMessage.ChatId,
+            replyTo: repliedMessage.DestinationMessage.TelegramMessageId,
+            customText: repliedMessage.CustomText,
+            dataCollection: repliedMessage.ReplyItself.OrderBy(lm => lm.TelegramMessageId).Select(lm => lm.Data),
+            markup: repliedMessage.Markup,
+            protect: repliedMessage.Protect);
+
+        return sentMessages.Zip(repliedMessage.ReplyItself).Select((m, i) => new ChainLink(
+            motherChain: repliedMessage.ReferenceLinks?.ElementAt(i).MotherChain ?? repliedMessage.ReferenceLink!.MotherChain,
+            recievedMessage: m.Second,
+            forwardedMessage: new LocalMessage(m.First),
+            repliedMessage: repliedMessage.DestinationMessage,
+            referenceLink: repliedMessage.ReferenceLinks?.ElementAt(i) ?? repliedMessage.ReferenceLink!
+        ));
     }
 }

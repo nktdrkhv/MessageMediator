@@ -29,8 +29,8 @@ public sealed class RegularReaction : CallbackQueryHandler
         if (queryArgs == null || queryArgs.Length != 2 || cntr.Update.Message == null || !int.TryParse(queryArgs[1], out int chainId))
         {
             await cntr.AnswerAsync("Некорректные данные");
-            await cntr.EditAsync(inlineKeyboardMarkup: null);
-            StopPropagation();
+            await cntr.EditAsync(inlineKeyboardMarkup: InlineKeyboardMarkup.Empty());
+            //StopPropagation();
             return;
         }
 
@@ -40,8 +40,8 @@ public sealed class RegularReaction : CallbackQueryHandler
         if (activeChain == null)
         {
             await cntr.AnswerAsync("Информация по данной цепочке сообщений отсутсвует");
-            await cntr.EditAsync(inlineKeyboardMarkup: null);
-            StopPropagation();
+            await cntr.EditAsync(inlineKeyboardMarkup: InlineKeyboardMarkup.Empty());
+            //StopPropagation();
             return;
         }
 
@@ -52,7 +52,7 @@ public sealed class RegularReaction : CallbackQueryHandler
         // todo: current model (e.g. accept:5 where 5 is chain's ID) is unsecure. Check rights via DecisionMakers property
         switch (queryArgs![0])
         {
-            case "ask":
+            case "question":
                 await _context.Chains.Entry(activeChain).Reference(c => c.Worker).LoadAsync();
                 await _context.Chains.Entry(activeChain).Collection(c => c.Links!).LoadAsync();
                 if (activeChain.Worker!.ChatId == chatId)
@@ -74,7 +74,7 @@ public sealed class RegularReaction : CallbackQueryHandler
                     });
                     await _context.SaveChangesAsync();
                     if (activeChain.TookAt != null)
-                        await cntr.EditAsync(inlineKeyboardMarkup: null);
+                        await cntr.EditAsync(inlineKeyboardMarkup: InlineKeyboardMarkup.Empty());
                     else
                         await cntr.EditAsync(inlineKeyboardMarkup: InlineKeyboardMarkupWrapper.OnlyTakeControls(activeChain.Id));
                 }
@@ -89,21 +89,24 @@ public sealed class RegularReaction : CallbackQueryHandler
                     await _context.SaveChangesAsync();
                     await cntr.AnswerAsync("Взято в работу");
                     if (activeChain.Links!.Any(l => l.Mode == ChainLinkMode.Question))
-                        await cntr.EditAsync(inlineKeyboardMarkup: null);
+                        await cntr.EditAsync(inlineKeyboardMarkup: InlineKeyboardMarkup.Empty());
                     else
-                        await cntr.EditAsync(inlineKeyboardMarkup: InlineKeyboardMarkupWrapper.OnlyAskControls(activeChain.Id));
+                        await cntr.EditAsync(inlineKeyboardMarkup: InlineKeyboardMarkupWrapper.OnlyQuestionControls(activeChain.Id));
                 }
                 break;
             case "accept":
                 // todo: the source might accept only one part of the responsed work. there sould be an option for a partial acception;
                 await _context.Chains.Entry(activeChain).Collection(c => c.Links!)
-                    .Query().Include(cl => cl.ForwardedMessage).Include(cl => cl.RecievedMessage).LoadAsync();
+                    .Query().AsSplitQuery()
+                    .Include(cl => cl.ForwardedMessage)
+                    .Include(cl => cl.RecievedMessage)
+                    .LoadAsync();
                 if (activeChain.SourceChatId == chatId)
                 {
                     activeChain.FinishedAt = DateTime.UtcNow;
                     await _context.SaveChangesAsync();
                     await cntr.AnswerAsync("Работа принята");
-                    await cntr.EditAsync(inlineKeyboardMarkup: null);
+                    await cntr.EditAsync(inlineKeyboardMarkup: InlineKeyboardMarkup.Empty());
                     var acceptedMessage = activeChain.Links!
                         .Single(cl => cl.ForwardedMessage.TelegramMessageId == cntr.Update.Message!.MessageId).RecievedMessage;
                     await cntr.BotClient.SendTextMessageAsync(
@@ -120,7 +123,7 @@ public sealed class RegularReaction : CallbackQueryHandler
             case "decline":
             case "reject":
                 await cntr.AnswerAsync("Работа отклонена. Ответьте на сообщение, чтобы оставить комментарий", showAlert: false);
-                await cntr.EditAsync(inlineKeyboardMarkup: null);
+                await cntr.EditAsync(inlineKeyboardMarkup: InlineKeyboardMarkup.Empty());
                 break;
             default:
                 await cntr.AnswerAsync("Неизвестная команда");

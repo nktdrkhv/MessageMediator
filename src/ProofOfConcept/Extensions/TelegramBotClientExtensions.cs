@@ -48,18 +48,22 @@ public static class TelegramBotClientExtensions
     public static async ValueTask<ICollection<LocalMessage>> SendIssueToSupervisorAsync(this ITelegramBotClient client, Chain chain)
     {
         var customText = chain.Trigger.Description(chain.PreparedData.First().Text);
-        var messages = await client.SendMessageDataAsync(chain.Supervisor!.ChatId, null, customText, chain.PreparedData);
+        var markup = InlineKeyboardMarkupWrapper.FullSupervisorControls(chain.Id);
+        var messages = await client.SendMessageDataAsync(chain.Supervisor!.ChatId, null, customText, chain.PreparedData, markup);
         return messages.OrderBy(m => m.MessageId).Select((m, _) => new LocalMessage(m)).ToArray();
     }
 
-    public static async ValueTask<ICollection<Message>> SendMessageDataAsync(this ITelegramBotClient client, long chatId, int? replyTo, string? customText, ICollection<MessageData> dataCollection, IReplyMarkup? markup = null, bool protect = true)
+    // todo: channging document's name can be only after reloading
+    public static async ValueTask<ICollection<Message>> SendMessageDataAsync(this ITelegramBotClient client, long chatId, int? replyTo, string? customText, IEnumerable<MessageData> dataCollection, IReplyMarkup? markup = null, bool protect = true)
     {
-        if (dataCollection.Count == 1 && dataCollection.First() is MessageData data)
+        if (dataCollection.Count() == 1 && dataCollection.First() is MessageData data)
         {
             switch (data.Type)
             {
                 case MessageDataType.Text:
-                    return new[] { await client.SendTextMessageAsync(chatId: chatId, text: customText ?? data.Text!, disableWebPagePreview: true, replyToMessageId: replyTo, allowSendingWithoutReply: true, replyMarkup: markup, protectContent: protect, parseMode: ParseMode.Html) };
+                    var textMsg = await client.SendTextMessageAsync(chatId: chatId, text: customText ?? data.Text!, disableWebPagePreview: true, replyToMessageId: replyTo, allowSendingWithoutReply: true, replyMarkup: markup, protectContent: protect, parseMode: ParseMode.Html);
+                    textMsg.Text = data.Text;
+                    return new[] { textMsg };
                 case MessageDataType.Media:
                     var media = data.Media!;
                     var mediaSending = media.MediaType switch
@@ -82,19 +86,24 @@ public static class TelegramBotClientExtensions
                             client.SendStickerAsync(chatId: chatId, sticker: InputFile.FromFileId(media.FileId!), replyToMessageId: replyTo, allowSendingWithoutReply: true, replyMarkup: markup, protectContent: protect),
                         _ => throw new ArgumentException("MediaFile has unsupported type")
                     };
-                    return new[] { await mediaSending };
+                    var mediaMsg = await mediaSending;
+                    mediaMsg.Caption = data.Text;
+                    return new[] { mediaMsg };
                 case MessageDataType.Contact:
                     return new[] { await client.SendContactAsync(chatId: chatId, phoneNumber: data.Contact!.PhoneNumber, firstName: data.Contact!.FirstName, lastName: data.Contact!.LastName, vCard: data.Contact!.Vcard) };
                 default:
                     throw new ArgumentException("MessageData has unsupported type");
             }
         }
-        else if (dataCollection.Count > 1 && dataCollection.All(md => !string.IsNullOrWhiteSpace(md.MediaGroupId)))
+        else if (dataCollection.Count() > 1 && dataCollection.All(md => !string.IsNullOrWhiteSpace(md.MediaGroupId)))
         {
-            var mediaAlbum = dataCollection.Select((dc, _) => (IAlbumInputMedia)InputFile.FromFileId(dc.Media!.FileId!)).ToArray();
+            var mediaAlbum = dataCollection.Select((dc, _) => (IAlbumInputMedia)InputFile.FromFileId(dc.Media!.FileId!));
             var messages = await client.SendMediaGroupAsync(chatId: chatId, media: mediaAlbum, protectContent: protect, replyToMessageId: replyTo);
             if (markup is InlineKeyboardMarkup inlineMarkup)
-                await client.EditMessageCaptionAsync(chatId, messages.First().MessageId, customText ?? dataCollection.First().Text, replyMarkup: inlineMarkup, parseMode: ParseMode.Html);
+                messages[0] = await client.EditMessageCaptionAsync(chatId, messages.First().MessageId, customText ?? dataCollection.First().Text, replyMarkup: inlineMarkup, parseMode: ParseMode.Html);
+            if (dataCollection.First().Text is string text)
+                messages.First().Caption = text;
+            return messages;
         }
         return Array.Empty<Message>();
     }

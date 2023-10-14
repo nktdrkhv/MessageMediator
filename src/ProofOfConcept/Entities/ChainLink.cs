@@ -11,6 +11,7 @@ ChainLink : ICreatedAt
     public int Id { get; private set; }
     public DateTime CreatedAt { get; private set; } = DateTime.UtcNow;
     public ChainLinkMode Mode { get; set; } = ChainLinkMode.Normal;
+    public bool Hide { get; set; } = false;
 
     public int MotherChainId { get; set; }
     public Chain MotherChain { get; set; } = null!;
@@ -20,17 +21,18 @@ ChainLink : ICreatedAt
     public LocalMessage RecievedMessage { get; set; } = null!;
     public LocalMessage ForwardedMessage { get; set; } = null!;
 
-    public ChainLink() { }
-
-    public ChainLink(Chain motherChain, LocalMessage recievedMessage, LocalMessage forwardedMessage, LocalMessage? repliedMessage = null)
+    public ChainLink(Chain motherChain, LocalMessage recievedMessage, LocalMessage forwardedMessage, LocalMessage? repliedMessage = null, ChainLink? referenceLink = null)
     {
         MotherChain = motherChain;
         RecievedMessage = recievedMessage;
         ForwardedMessage = forwardedMessage;
 
+        Mode = referenceLink?.Mode ?? ChainLinkMode.Normal;
         recievedMessage.ReferenceTo = repliedMessage;
         forwardedMessage.ReferenceTo = recievedMessage;
     }
+
+    public ChainLink() { }
 
     public bool IsBelongTo(long chatId) =>
         (MotherChain.SourceChatId == chatId) ||

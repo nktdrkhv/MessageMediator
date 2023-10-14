@@ -3,5 +3,7 @@ namespace MessageMediator.ProofOfConcept.Enums;
 public enum ChainLinkMode
 {
     Normal,
-    Question
+    Question,
+    Revision,
+    Remark
 }

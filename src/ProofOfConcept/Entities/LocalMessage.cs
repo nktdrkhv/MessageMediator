@@ -23,6 +23,9 @@ public class LocalMessage : ICreatedAt
     public int DataId { get; set; }
     public MessageData Data { get; set; } = null!;
 
+    public bool ActiveMarkup { get; set; }
+    public bool ForceShow { get; set; }
+
     public LocalMessage(Message message) : this(null, message) { }
 
     public LocalMessage(string? customText, Message message)
@@ -31,13 +34,14 @@ public class LocalMessage : ICreatedAt
         ChatId = message.Chat.Id;
         UserId = message.From?.Id;
         Data = new MessageData(customText, message);
+        ActiveMarkup = message.ReplyMarkup != null;
     }
 
     private LocalMessage() { }
 
     public static ICollection<LocalMessage> FromSet(string? customText, params Message[] messages)
     {
-        var locals = new List<LocalMessage> { new LocalMessage(customText, messages.First()) };
+        var locals = new List<LocalMessage> { new(customText, messages.First()) };
         foreach (var msg in messages.Skip(1))
             locals.Add(new(null, msg));
         return locals;
