@@ -2,9 +2,7 @@ using MessageMediator.ProofOfConcept.Entities;
 using MessageMediator.ProofOfConcept.Extensions;
 using MessageMediator.ProofOfConcept.Persistance;
 using MessageMediator.ProofOfConcept.Enums;
-
 using Telegram.Bot.Types;
-
 using TelegramUpdater.FilterAttributes.Attributes;
 using TelegramUpdater.Filters;
 using TelegramUpdater.Helpers;
@@ -30,7 +28,7 @@ public sealed class Authorization : MessageHandler
                      && i.RedeemAt == null) is Invitation invitation)
         {
             var user = await _context.GetOrCreateLocalUserAsync(cntr.Sender()!);
-            invitation.RedeemAt = DateTime.UtcNow;
+            invitation.Redeemed();
             switch (invitation.Target)
             {
                 case InvitationTarget.SourceRole:
@@ -42,7 +40,6 @@ public sealed class Authorization : MessageHandler
                         sourceChat.SourcingFor!.Add(invitation.Trigger.Source);
                         _context.LocalChats.Add(sourceChat);
                     }
-
                     break;
                 case InvitationTarget.WorkerRole:
                     var workerChat = await _context.GetOrCreateLocalChatAsync(cntr.Update.Chat);
@@ -52,7 +49,9 @@ public sealed class Authorization : MessageHandler
                     {
                         var worker = new Worker
                         {
-                            TriggerId = invitation.TriggerId, Chat = workerChat, Alias = invitation.NewAlias
+                            TriggerId = invitation.TriggerId,
+                            Chat = workerChat,
+                            Alias = invitation.NewAlias
                         };
                         _context.Workers.Add(worker);
                     }
@@ -66,11 +65,12 @@ public sealed class Authorization : MessageHandler
                     {
                         var supervisor = new Supervisor()
                         {
-                            TriggerId = invitation.TriggerId, Chat = supervisorChat, Alias = invitation.NewAlias
+                            TriggerId = invitation.TriggerId,
+                            Chat = supervisorChat,
+                            Alias = invitation.NewAlias
                         };
                         _context.Supervisors.Add(supervisor);
                     }
-
                     break;
             }
 

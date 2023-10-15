@@ -43,4 +43,7 @@ public static class InlineKeyboardMarkupWrapper
                 InlineKeyboardButton.WithCallbackData("✅", $"approve:{chainId}"),
                 InlineKeyboardButton.WithCallbackData("⛔️", $"reject:{chainId}"),
             });
+
+    public static InlineKeyboardMarkup FromCustomSet(IEnumerable<Tuple<string, int>> set, string prefix) =>
+        new(set.Select(value => InlineKeyboardButton.WithCallbackData(value.Item1, $"{prefix}:{value.Item2}")));
 }

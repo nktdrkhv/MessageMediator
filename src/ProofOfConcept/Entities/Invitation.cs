@@ -10,13 +10,24 @@ public class Invitation : ICreatedAt
 {
     public int Id { get; private set; }
 
-    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
-    public DateTime? RedeemAt { get; set; }
+    public DateTime CreatedAt { get; private set; } = DateTime.UtcNow;
+    public DateTime? RedeemAt { get; private set; }
 
-    public int TriggerId { get; set; }
-    public Trigger Trigger { get; set; } = null!;
+    public int TriggerId { get; private set; }
+    public Trigger Trigger { get; private set; } = null!;
 
-    public InvitationTarget Target { get; set; }
-    public string Code { get; set; } = Guid.NewGuid().ToString()[..7];
-    public string? NewAlias { get; set; }
+    public InvitationTarget Target { get; private set; }
+    public string Code { get; private set; } = Guid.NewGuid().ToString()[..7];
+    public string NewAlias { get; private set; } = null!;
+
+    public Invitation(Trigger trigger, InvitationTarget target, string newAlias)
+    {
+        Trigger = trigger;
+        Target = target;
+        NewAlias = newAlias;
+    }
+
+    private Invitation() { }
+
+    public void Redeemed() => RedeemAt = DateTime.UtcNow;
 }
