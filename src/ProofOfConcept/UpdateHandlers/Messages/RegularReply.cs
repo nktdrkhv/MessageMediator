@@ -31,18 +31,7 @@ public sealed class RegularReply : MessageHandler
         try
         {
             chainLink = _context.ChainLinks
-                .Where(cl => cl.MotherChain.FinishedAt == null)
-                .Where(cl =>
-                    (cl.ForwardedMessage.TelegramMessageId == repliedTo.MessageId &&
-                        cl.ForwardedMessage.ChatId == repliedTo.Chat.Id) ||
-                    (cl.RecievedMessage.TelegramMessageId == repliedTo.MessageId &&
-                        cl.RecievedMessage.ChatId == repliedTo.Chat.Id))
-                .Where(cl =>
-                    !cl.Hide ||
-                    (cl.ForwardedMessage.ForceShow &&
-                        cl.ForwardedMessage.ChatId == repliedTo.Chat.Id) ||
-                    (cl.RecievedMessage.ForceShow &&
-                        cl.RecievedMessage.ChatId == repliedTo.Chat.Id))
+                .WhereLinkFits(repliedTo, true)
                 .IncludeChainLinkParts()
                 .SingleOrDefault();
         }
@@ -193,7 +182,7 @@ public sealed class RegularReply : MessageHandler
         await _context.SaveChangesAsync();
     }
 
-    private static async ValueTask<IEnumerable<ChainLink>> ForwardReplyMessage(IUpdateContainer cntr, RepliedMessage repliedMessage)
+    public static async ValueTask<IEnumerable<ChainLink>> ForwardReplyMessage(IUpdateContainer cntr, RepliedMessage repliedMessage)
     {
         // todo: sould BotClient.ForwardMessageAsync be better for Source and Supervisor messages?
         var sentMessages = await cntr.BotClient.SendMessageDataAsync(

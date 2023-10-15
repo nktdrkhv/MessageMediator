@@ -42,4 +42,12 @@ public static class DbContextExtensions
             .Include(cl => cl.ForwardedMessage.ReferenceTo)
             .Include(cl => cl.RecievedMessage.ReferenceTo)
             .AsSplitQuery();
+
+    public static IQueryable<ChainLink> WhereLinkFits(this IQueryable<ChainLink> query, LocalMessage message, bool checkVisibility) => checkVisibility
+        ? query.Where(cl => cl.ForwardedMessage == message || cl.RecievedMessage == message).Where(cl => !cl.Hide || cl.ForwardedMessage.ForceShow || cl.RecievedMessage.ForceShow).Where(cl => cl.MotherChain.FinishedAt == null)
+        : query.Where(cl => cl.ForwardedMessage == message || cl.RecievedMessage == message).Where(cl => cl.MotherChain.FinishedAt == null);
+
+    public static IQueryable<ChainLink> WhereLinkFits(this IQueryable<ChainLink> query, Message message, bool checkVisibility) => checkVisibility
+        ? query.Where(cl => (cl.ForwardedMessage.TelegramMessageId == message.MessageId && cl.ForwardedMessage.ChatId == message.Chat.Id) || (cl.RecievedMessage.TelegramMessageId == message.MessageId && cl.RecievedMessage.ChatId == message.Chat.Id)).Where(cl => !cl.Hide || cl.ForwardedMessage.ForceShow || cl.RecievedMessage.ForceShow).Where(cl => cl.MotherChain.FinishedAt == null)
+        : query.Where(cl => (cl.ForwardedMessage.TelegramMessageId == message.MessageId && cl.ForwardedMessage.ChatId == message.Chat.Id) || (cl.RecievedMessage.TelegramMessageId == message.MessageId && cl.RecievedMessage.ChatId == message.Chat.Id)).Where(cl => cl.MotherChain.FinishedAt == null);
 }
