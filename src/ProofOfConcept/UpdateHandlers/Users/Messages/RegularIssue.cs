@@ -1,4 +1,4 @@
-using MessageMediator.ProofOfConcept.Aggregates;
+using MessageMediator.ProofOfConcept.Dto;
 using MessageMediator.ProofOfConcept.Configuration;
 using MessageMediator.ProofOfConcept.Entities;
 using MessageMediator.ProofOfConcept.Enums;
@@ -75,7 +75,7 @@ public sealed class RegularIssue : MessageHandler
                     Length = e.Length
                 };
             var matches = await matchesQuery.ToArrayAsync();
-            if (!matches.Any())
+            if (matches.Length == 0)
                 return;
             for (var i = 0; i < matches.Length; i++)
             {
@@ -176,8 +176,8 @@ public sealed class RegularIssue : MessageHandler
                 // -----------------------------------
 
                 var triggerLabel = chain.Trigger.Label;
-                var sourceLabel = chat.DefaultAlias ?? chat.Name;
-                var workerLabel = worker.Chat.DefaultAlias ?? worker.Chat.Name;
+                var sourceLabel = chat.Alias ?? chat.Name;
+                var workerLabel = worker.Chat.Alias ?? worker.Chat.Name;
 
                 foreach (var adminId in _conf.Administrators)
                     await cntr.BotClient.SendTextMessageAsync(adminId,

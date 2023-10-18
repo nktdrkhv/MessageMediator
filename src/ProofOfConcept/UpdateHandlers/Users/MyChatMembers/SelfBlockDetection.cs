@@ -44,16 +44,16 @@ public sealed class SelfBlockDetection : MyChatMemberHandler
 
         if (cntr.Update.NewChatMember.Status == ChatMemberStatus.Member)
         {
-            chat!.IsSelfBlocked = true;
-            await UserBlock(chat, true);
+            chat!.IsSelfBlocked = false;
+            await UserBlock(chat, false);
 
             foreach (var adminId in _conf.Administrators)
                 await cntr.BotClient.SendChatUnblockedNotificationAsync(adminId, chat);
         }
         else if (cntr.Update.NewChatMember.Status is ChatMemberStatus.Left or ChatMemberStatus.Kicked)
         {
-            chat!.IsSelfBlocked = false;
-            await UserBlock(chat, false);
+            chat!.IsSelfBlocked = true;
+            await UserBlock(chat, true);
 
             foreach (var adminId in _conf.Administrators)
                 await cntr.BotClient.SendChatBlockedNotificationAsync(adminId, chat);

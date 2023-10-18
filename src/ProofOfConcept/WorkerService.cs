@@ -1,4 +1,9 @@
+using MessageMediator.ProofOfConcept.Configuration;
+using MessageMediator.ProofOfConcept.Persistance;
+using Microsoft.Extensions.Options;
+using Telegram.Bot;
 using Telegram.Bot.Polling;
+using Telegram.Bot.Types;
 using TelegramUpdater;
 using TelegramUpdater.Hosting;
 
@@ -11,7 +16,6 @@ public class WorkerService : UpdateWriterServiceAbs
     public WorkerService(IServiceScopeFactory scopeFactory, IUpdater updater) : base(updater)
     {
         _scopeFactory = scopeFactory;
-
         updater.AddUserNumericStateKeeper("admin");
 
         // todo: chat numeric state keeper
@@ -22,25 +26,23 @@ public class WorkerService : UpdateWriterServiceAbs
 
     public override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        // using (var scope = _scopeFactory.CreateScope())
-        // {
-        //     var provider = scope.ServiceProvider;
-        //     var db = provider.GetRequiredService<BotDbContext>();
-        //     var conf = provider.GetRequiredService<IOptions<BotConfiguration>>().Value;
+        using (var scope = _scopeFactory.CreateScope())
+        {
+            var provider = scope.ServiceProvider;
+            var conf = provider.GetRequiredService<IOptions<BotConfiguration>>().Value;
+            var db = provider.GetRequiredService<BotDbContext>();
 
-        //     Updater.TryGetUserNumericStateKeeper("admin", out var keeper);
-        //     foreach (var adminId in conf.Administrators)
-        //     {
-        //         keeper!.SetState(adminId, 0);
-        //         var commandsScope = BotCommandScope.Chat(new ChatId(adminId));
-        //         await Updater.BotClient.SetMyCommandsAsync(new BotCommand[]
-        //         {
-        //             new BotCommand() {Command = "sources", Description = "Источники задач"},
-        //             new BotCommand() {Command = "workers", Description = "Исполнители"},
-        //             new BotCommand() {Command = "supervisors", Description = "Проверяющие"}
-        //         }, scope: commandsScope, cancellationToken: stoppingToken);
-        //     }
-        // }
+            Updater.TryGetUserNumericStateKeeper("admin", out var keeper);
+            foreach (var adminId in conf.Administrators)
+            {
+                keeper!.SetState(adminId, 0);
+                var commandsScope = BotCommandScope.Chat(new ChatId(adminId));
+                await Updater.BotClient.SetMyCommandsAsync(new BotCommand[]
+                {
+                    new() {Command = "issues", Description = "Распределение задач"},
+                }, scope: commandsScope, cancellationToken: stoppingToken);
+            }
+        }
 
         while (!stoppingToken.IsCancellationRequested)
         {

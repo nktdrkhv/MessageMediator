@@ -9,6 +9,10 @@ using TelegramUpdater.Helpers;
 using TelegramUpdater.UpdateContainer;
 using TelegramUpdater.UpdateHandlers.Scoped;
 using TelegramUpdater.UpdateHandlers.Scoped.ReadyToUse;
+using MessageMediator.ProofOfConcept.Configuration;
+using Microsoft.Extensions.Options;
+using Telegram.Bot;
+using Telegram.Bot.Types.Enums;
 
 namespace MessageMediator.ProofOfConcept.UpdateHandlers.Messages;
 
@@ -16,8 +20,13 @@ namespace MessageMediator.ProofOfConcept.UpdateHandlers.Messages;
 public sealed class Authorization : MessageHandler
 {
     private readonly BotDbContext _context;
+    private readonly BotConfiguration _conf;
 
-    public Authorization(BotDbContext context) => _context = context;
+    public Authorization(BotDbContext context, IOptions<BotConfiguration> options)
+    {
+        _context = context;
+        _conf = options.Value;
+    }
 
     protected override async Task HandleAsync(IContainer<Message> cntr)
     {
@@ -51,7 +60,7 @@ public sealed class Authorization : MessageHandler
                         {
                             TriggerId = invitation.TriggerId,
                             Chat = workerChat,
-                            Alias = invitation.NewAlias
+                            Name = invitation.NewName
                         };
                         _context.Workers.Add(worker);
                     }
@@ -67,19 +76,26 @@ public sealed class Authorization : MessageHandler
                         {
                             TriggerId = invitation.TriggerId,
                             Chat = supervisorChat,
-                            Alias = invitation.NewAlias
+                            Name = invitation.NewName
                         };
                         _context.Supervisors.Add(supervisor);
                     }
                     break;
             }
-
             await _context.SaveChangesAsync();
         }
         else
         {
-            await _context.GetOrCreateLocalUserAsync(cntr.Sender()!);
-            await cntr.ResponseAsync("Мы любим любопытных");
+            if (_context.LocalUsers.Find(cntr.SenderId()!) == null)
+            {
+                var user = await _context.GetOrCreateLocalUserAsync(cntr.Sender()!);
+                await cntr.Delete();
+                await SendTextMessageAsync("<tg-spoiler>Мы любим любопытных</tg-spoiler>", parseMode: ParseMode.Html);
+                foreach (var adminId in _conf.Administrators)
+                    await cntr.BotClient.SendTextMessageAsync(adminId, $"Пользователь <a href=\"tg://user?id={user.Id}\"><u>{user.Name}</u> ({user.Id})</a> проявил(а) любопытство", parseMode: ParseMode.Html);
+            }
+            else
+                await cntr.Delete();
         }
 
         StopPropagation();

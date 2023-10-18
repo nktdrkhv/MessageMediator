@@ -8,7 +8,7 @@ public static class TriggerExtensions
     public static string Description(this Trigger trigger, string? addition = null)
     {
         var sb = new StringBuilder();
-        sb.AppendLine($"Задача от <b>{trigger.Source.Alias}</b>");
+        sb.AppendLine($"Задача от <b>{trigger.Source.Name}</b>");
         if (trigger.Label != null)
             sb.AppendLine($"Тип: <u>{trigger.Label}</u>");
         if (!string.IsNullOrWhiteSpace(addition))

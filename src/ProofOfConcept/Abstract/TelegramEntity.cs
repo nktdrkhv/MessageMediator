@@ -11,7 +11,7 @@ public abstract class TelegramEntity : ICreatedAt
 
     public string Name { get; set; } = null!;
     public string? Username { get; set; }
-    public string? DefaultAlias { get; set; }
+    public string? Alias { get; set; }
 
     public bool IsSelfBlocked { get; set; } = false;
 

@@ -2,7 +2,7 @@ using System.Collections;
 using MessageMediator.ProofOfConcept.Entities;
 using Telegram.Bot.Types.ReplyMarkups;
 
-namespace MessageMediator.ProofOfConcept.Aggregates;
+namespace MessageMediator.ProofOfConcept.Dto;
 
 public record RepliedMessage
 {

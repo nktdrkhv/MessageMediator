@@ -18,13 +18,13 @@ public class Invitation : ICreatedAt
 
     public InvitationTarget Target { get; private set; }
     public string Code { get; private set; } = Guid.NewGuid().ToString()[..7];
-    public string NewAlias { get; private set; } = null!;
+    public string NewName { get; private set; } = null!;
 
-    public Invitation(Trigger trigger, InvitationTarget target, string newAlias)
+    public Invitation(Trigger trigger, InvitationTarget target, string newName)
     {
         Trigger = trigger;
         Target = target;
-        NewAlias = newAlias;
+        NewName = newName;
     }
 
     private Invitation() { }

@@ -1,6 +1,6 @@
 using MessageMediator.ProofOfConcept.Enums;
 
-namespace MessageMediator.ProofOfConcept.Aggregates;
+namespace MessageMediator.ProofOfConcept.Dto;
 
 public record MatchedTrigger
 {

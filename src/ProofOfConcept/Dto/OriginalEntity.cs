@@ -1,6 +1,6 @@
 using Telegram.Bot.Types.Enums;
 
-namespace MessageMediator.ProofOfConcept.Aggregates;
+namespace MessageMediator.ProofOfConcept.Dto;
 
 public record OriginalEntity
 {

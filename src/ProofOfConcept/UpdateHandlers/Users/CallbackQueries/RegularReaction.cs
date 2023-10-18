@@ -1,4 +1,4 @@
-using MessageMediator.ProofOfConcept.Aggregates;
+using MessageMediator.ProofOfConcept.Dto;
 using MessageMediator.ProofOfConcept.Entities;
 using MessageMediator.ProofOfConcept.Enums;
 using MessageMediator.ProofOfConcept.Extensions;
