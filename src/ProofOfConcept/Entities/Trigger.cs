@@ -7,7 +7,7 @@ namespace MessageMediator.ProofOfConcept.Entities;
 [Table("Trigger")]
 public class Trigger
 {
-    public int Id { get; private set; }
+    public int Id { get; }
     public string? Label { get; set; }
 
     public string Text { get; set; } = null!;

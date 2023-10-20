@@ -1,5 +1,4 @@
 using MessageMediator.ProofOfConcept.Entities;
-using MessageMediator.ProofOfConcept.Enums;
 
 namespace MessageMediator.ProofOfConcept.Abstract;
 

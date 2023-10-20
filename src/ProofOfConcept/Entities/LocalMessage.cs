@@ -1,7 +1,6 @@
 using System.Collections;
 using System.ComponentModel.DataAnnotations.Schema;
 using MessageMediator.ProofOfConcept.Abstract;
-using Microsoft.EntityFrameworkCore.Query.Internal;
 using Telegram.Bot.Types;
 
 namespace MessageMediator.ProofOfConcept.Entities;
@@ -9,9 +8,21 @@ namespace MessageMediator.ProofOfConcept.Entities;
 [Table("Message")]
 public class LocalMessage : ICreatedAt, IEnumerable<LocalMessage>
 {
-    public int Id { get; private set; }
+    public LocalMessage(Message message, bool forceShow = false) : this(null, message, forceShow) { }
+
+    public LocalMessage(string? customText, Message message, bool forceShow = false)
+    {
+        TelegramMessageId = message.MessageId;
+        ChatId = message.Chat.Id;
+        UserId = message.From?.Id;
+        Data = new MessageData(customText, message);
+        ActiveMarkup = message.ReplyMarkup != null;
+        ForceShow = forceShow;
+    }
+
+    private LocalMessage() { }
+    public int Id { get; }
     public int TelegramMessageId { get; private set; }
-    public DateTime CreatedAt { get; private set; } = DateTime.UtcNow;
 
     public int? ReferenceToId { get; set; }
     public LocalMessage? ReferenceTo { get; set; }
@@ -26,45 +37,48 @@ public class LocalMessage : ICreatedAt, IEnumerable<LocalMessage>
 
     public bool ActiveMarkup { get; set; }
     public bool ForceShow { get; set; }
+    public DateTime CreatedAt { get; } = DateTime.UtcNow;
 
-    public LocalMessage(Message message, bool forceShow = false) : this(null, message, forceShow) { }
-
-    public LocalMessage(string? customText, Message message, bool forceShow = false)
+    public IEnumerator<LocalMessage> GetEnumerator()
     {
-        TelegramMessageId = message.MessageId;
-        ChatId = message.Chat.Id;
-        UserId = message.From?.Id;
-        Data = new MessageData(customText, message);
-        ActiveMarkup = message.ReplyMarkup != null;
-        ForceShow = forceShow;
+        return new LocalMessageEnumerator(this);
     }
 
-    private LocalMessage() { }
+    IEnumerator IEnumerable.GetEnumerator()
+    {
+        return new LocalMessageEnumerator(this);
+    }
 
     public static ICollection<LocalMessage> FromSet(string? customText, params Message[] messages)
     {
-        var locals = new List<LocalMessage> { new(customText, messages.First()) };
-        foreach (var msg in messages.Skip(1))
-            locals.Add(new(null, msg));
+        List<LocalMessage> locals = new List<LocalMessage> { new(customText, messages.First()) };
+        foreach (Message msg in messages.Skip(1))
+        {
+            locals.Add(new LocalMessage(null, msg));
+        }
+
         return locals;
     }
-
-    public IEnumerator<LocalMessage> GetEnumerator() => new LocalMessageEnumerator(this);
-    IEnumerator IEnumerable.GetEnumerator() => new LocalMessageEnumerator(this);
 }
 
 public class LocalMessageEnumerator : IEnumerator<LocalMessage>
 {
     private readonly LocalMessage _start;
-    private LocalMessage? _current = null;
+    private LocalMessage? _current;
+
+    public LocalMessageEnumerator(LocalMessage localMessage)
+    {
+        _start = localMessage;
+    }
 
     public LocalMessage Current => _current ?? throw new ArgumentException();
     object IEnumerator.Current => Current;
 
-    public LocalMessageEnumerator(LocalMessage localMessage) => _start = localMessage;
 
-
-    public void Dispose() => GC.SuppressFinalize(this);
+    public void Dispose()
+    {
+        GC.SuppressFinalize(this);
+    }
 
     public bool MoveNext()
     {
@@ -73,11 +87,12 @@ public class LocalMessageEnumerator : IEnumerator<LocalMessage>
             _current = _current.ReferenceTo;
             return true;
         }
-        else
-        {
-            return false;
-        }
+
+        return false;
     }
 
-    public void Reset() => _current = _start;
+    public void Reset()
+    {
+        _current = _start;
+    }
 }

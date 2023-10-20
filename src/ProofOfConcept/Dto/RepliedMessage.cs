@@ -1,4 +1,3 @@
-using System.Collections;
 using MessageMediator.ProofOfConcept.Entities;
 using Telegram.Bot.Types.ReplyMarkups;
 

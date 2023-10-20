@@ -6,15 +6,6 @@ namespace MessageMediator.ProofOfConcept.Abstract;
 
 public abstract class TelegramEntity : ICreatedAt
 {
-    [Key] public long Id { get; set; }
-    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
-
-    public string Name { get; set; } = null!;
-    public string? Username { get; set; }
-    public string? Alias { get; set; }
-
-    public bool IsSelfBlocked { get; set; } = false;
-
     protected TelegramEntity(Chat chat)
     {
         Id = chat.Id;
@@ -24,7 +15,7 @@ public abstract class TelegramEntity : ICreatedAt
             ChatType.Group => chat.Title!,
             ChatType.Channel => chat.Title!,
             ChatType.Supergroup => chat.Title!,
-            _ => throw new NotImplementedException(),
+            _ => throw new NotImplementedException()
         };
         Username = chat.Username;
     }
@@ -37,4 +28,12 @@ public abstract class TelegramEntity : ICreatedAt
     }
 
     protected TelegramEntity() { }
+    [Key] public long Id { get; set; }
+
+    public string Name { get; set; } = null!;
+    public string? Username { get; set; }
+    public string? Alias { get; set; }
+
+    public bool IsSelfBlocked { get; set; } = false;
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }

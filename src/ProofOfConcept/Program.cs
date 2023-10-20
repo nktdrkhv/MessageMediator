@@ -13,18 +13,18 @@ IHost host = Host.CreateDefaultBuilder(args)
     {
         services.Configure<BotConfiguration>(context.Configuration.GetSection(BotConfiguration.Section));
         services.AddHttpClient("telegram_bot_client")
-                .AddTypedClient<ITelegramBotClient>((httpClient, sp) =>
-                {
-                    var configuration = sp.GetService<IOptions<BotConfiguration>>()!.Value;
-                    var clientOptions = new TelegramBotClientOptions(
-                        token: configuration.ApiToken,
-                        baseUrl: configuration.BaseUrl,
-                        useTestEnvironment: configuration.IsTestEnv);
-                    return new TelegramBotClient(clientOptions, httpClient);
-                });
+            .AddTypedClient<ITelegramBotClient>((httpClient, sp) =>
+            {
+                BotConfiguration configuration = sp.GetService<IOptions<BotConfiguration>>()!.Value;
+                TelegramBotClientOptions clientOptions = new TelegramBotClientOptions(
+                    configuration.ApiToken,
+                    configuration.BaseUrl,
+                    configuration.IsTestEnv);
+                return new TelegramBotClient(clientOptions, httpClient);
+            });
         services.AddTelegramUpdater<WorkerService>(
             new UpdaterOptions(
-                maxDegreeOfParallelism: 32,
+                32,
                 flushUpdatesQueue: true,
                 allowedUpdates: Array.Empty<UpdateType>()),
             builder => builder
@@ -32,7 +32,7 @@ IHost host = Host.CreateDefaultBuilder(args)
                 .AddDefaultExceptionHandler());
         services.AddDbContext<BotDbContext>(options =>
         {
-            var connection = context.Configuration.GetConnectionString("SQLite");
+            string? connection = context.Configuration.GetConnectionString("SQLite");
             options.UseSqlite(connection);
         });
         services.AddHostedService<WorkerService>();

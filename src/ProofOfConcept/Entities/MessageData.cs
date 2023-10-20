@@ -1,5 +1,4 @@
 using System.ComponentModel.DataAnnotations.Schema;
-using System.Data;
 using MessageMediator.ProofOfConcept.Enums;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
@@ -9,31 +8,25 @@ namespace MessageMediator.ProofOfConcept.Entities;
 [Table("MessageData")]
 public class MessageData
 {
-    public int Id { get; private set; }
-    public string? MediaGroupId { get; private set; }
-    public MessageDataType Type { get; private set; }
-
-    public string? Text { get; set; }
-    public Media? Media { get; set; }
-    public Contact? Contact { get; set; }
-
     public MessageData(string? text, Message message)
     {
         if (message.MediaGroupId == null)
+        {
             Type = message.Type switch
             {
                 MessageType.Text => MessageDataType.Text,
                 MessageType.Photo or MessageType.Animation or MessageType.Photo or MessageType.Video or
-                MessageType.VideoNote or MessageType.Audio or MessageType.Voice or MessageType.Document or
-                MessageType.Sticker => MessageDataType.Media,
+                    MessageType.VideoNote or MessageType.Audio or MessageType.Voice or MessageType.Document or
+                    MessageType.Sticker => MessageDataType.Media,
                 MessageType.Contact => MessageDataType.Contact,
                 _ => MessageDataType.Unknown
             };
+        }
         else
         {
             Type = message.Type is MessageType.Photo or MessageType.Video or MessageType.Document or MessageType.Audio
-                        ? MessageDataType.MediaAlbum
-                        : MessageDataType.Unknown;
+                ? MessageDataType.MediaAlbum
+                : MessageDataType.Unknown;
             MediaGroupId = message.MediaGroupId;
         }
 
@@ -52,4 +45,11 @@ public class MessageData
     }
 
     private MessageData() { }
+    public int Id { get; }
+    public string? MediaGroupId { get; }
+    public MessageDataType Type { get; }
+
+    public string? Text { get; set; }
+    public Media? Media { get; set; }
+    public Contact? Contact { get; set; }
 }

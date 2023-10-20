@@ -8,16 +8,14 @@ namespace MessageMediator.ProofOfConcept.Entities;
 [Table("Media")]
 public class Media
 {
-    public int Id { get; private set; }
-    public MediaType MediaType { get; private set; } = MediaType.None;
-    public string? FileId { get; private set; }
-    public string? FileUniqueId { get; private set; }
-    public string? Path { get; private set; }
-
     public Media(MediaType mediaType, string? fileId = null, string? fileUniqueId = null, string? path = null)
     {
         if (string.IsNullOrWhiteSpace(fileId) && string.IsNullOrWhiteSpace(path))
-            throw new ArgumentNullException(nameof(path), "Path of the local media file can not be null, if fileId is not submitted");
+        {
+            throw new ArgumentNullException(nameof(path),
+                "Path of the local media file can not be null, if fileId is not submitted");
+        }
+
         MediaType = mediaType;
         FileId = fileId;
         FileUniqueId = fileUniqueId;
@@ -28,17 +26,26 @@ public class Media
     {
         Set(message);
         if (string.IsNullOrWhiteSpace(FileId) || MediaType == MediaType.None)
+        {
             throw new ArgumentException("There is no suitable media in the submitted message", nameof(message));
+        }
     }
 
     private Media() { }
+    public int Id { get; }
+    public MediaType MediaType { get; private set; } = MediaType.None;
+    public string? FileId { get; private set; }
+    public string? FileUniqueId { get; private set; }
+    public string? Path { get; private set; }
 
     public void Set(Message message)
     {
         if (!string.IsNullOrWhiteSpace(FileId))
+        {
             return;
+        }
 
-        var converted = message.Type switch
+        MediaType converted = message.Type switch
         {
             MessageType.Photo => MediaType.Photo,
             MessageType.Audio => MediaType.Audio,
@@ -52,14 +59,16 @@ public class Media
         };
 
         if (MediaType != MediaType.None && MediaType != converted)
+        {
             return;
-        else
-            MediaType = converted;
+        }
+
+        MediaType = converted;
 
         switch (message.Type)
         {
             case MessageType.Photo:
-                var photo = message.Photo!.Last();
+                PhotoSize photo = message.Photo!.Last();
                 FileId = photo.FileId;
                 FileUniqueId = photo.FileUniqueId;
                 break;
@@ -91,8 +100,8 @@ public class Media
                 FileId = message.Animation!.FileId;
                 FileUniqueId = message.Animation!.FileUniqueId;
                 break;
-            default:
-                break;
-        };
+        }
+
+        ;
     }
 }

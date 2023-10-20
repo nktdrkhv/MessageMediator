@@ -8,6 +8,12 @@ namespace MessageMediator.ProofOfConcept.Entities;
 [Table("Chat")]
 public class LocalChat : TelegramEntity
 {
+    public LocalChat(Chat chat) : base(chat)
+    {
+        ChatType = chat.Type;
+    }
+
+    private LocalChat() { }
     public ChatType ChatType { get; set; }
 
     public ICollection<LocalUser>? DecisionMakers { get; set; }
@@ -15,7 +21,4 @@ public class LocalChat : TelegramEntity
     public ICollection<Source>? SourcingFor { get; set; }
     public ICollection<Worker>? WorkingOn { get; set; }
     public ICollection<Supervisor>? SupervisingOn { get; set; }
-
-    public LocalChat(Chat chat) : base(chat) => ChatType = chat.Type;
-    private LocalChat() { }
 }

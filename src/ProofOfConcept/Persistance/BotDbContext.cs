@@ -1,4 +1,3 @@
-using System.Reflection;
 using MessageMediator.ProofOfConcept.Abstract;
 using MessageMediator.ProofOfConcept.Entities;
 using Microsoft.EntityFrameworkCore;
@@ -8,6 +7,12 @@ namespace MessageMediator.ProofOfConcept.Persistance;
 
 public class BotDbContext : DbContext
 {
+    public BotDbContext(DbContextOptions<BotDbContext> options) : base(options)
+    {
+        // Database.EnsureDeleted();
+        Database.EnsureCreated();
+    }
+
     public DbSet<Invitation> Invitations { get; set; } = null!;
     public DbSet<Chain> Chains { get; set; } = null!;
     public DbSet<ChainLink> ChainLinks { get; set; } = null!;
@@ -21,12 +26,6 @@ public class BotDbContext : DbContext
     public DbSet<MessageData> MessageData { get; set; } = null!;
     public DbSet<Media> Media { get; set; } = null!;
     public DbSet<Contact> Contacts { get; set; } = null!;
-
-    public BotDbContext(DbContextOptions<BotDbContext> options) : base(options)
-    {
-        // Database.EnsureDeleted();
-        Database.EnsureCreated();
-    }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -54,12 +53,12 @@ public class BotDbContext : DbContext
 
         modelBuilder.Entity<LocalChat>()
             .HasMany(lc => lc.DecisionMakers)
-                .WithMany(lu => lu.ResponsibleFor)
-                .UsingEntity(join => join.ToTable("ChatRuler"));
+            .WithMany(lu => lu.ResponsibleFor)
+            .UsingEntity(join => join.ToTable("ChatRuler"));
         modelBuilder.Entity<LocalChat>()
             .HasMany(lc => lc.SourcingFor)
-                .WithMany(s => s.Submitters)
-                .UsingEntity(join => join.ToTable("Submitter"));
+            .WithMany(s => s.Submitters)
+            .UsingEntity(join => join.ToTable("Submitter"));
     }
 
     protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)

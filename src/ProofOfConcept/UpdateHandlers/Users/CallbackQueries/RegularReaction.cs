@@ -20,29 +20,33 @@ public sealed class RegularReaction : CallbackQueryHandler
 {
     private readonly BotDbContext _context;
 
-    public RegularReaction(BotDbContext context) => _context = context;
+    public RegularReaction(BotDbContext context)
+    {
+        _context = context;
+    }
 
     protected override async Task HandleAsync(IContainer<CallbackQuery> cntr)
     {
-        var queryArgs = cntr.Update.Data?.Split(':');
+        string[]? queryArgs = cntr.Update.Data?.Split(':');
 
         // ----------- validation -----------
 
-        if (queryArgs == null || queryArgs.Length != 2 || cntr.Update.Message == null || !int.TryParse(queryArgs[1], out int chainId))
+        if (queryArgs == null || queryArgs.Length != 2 || cntr.Update.Message == null ||
+            !int.TryParse(queryArgs[1], out int chainId))
         {
             await cntr.AnswerAsync("Некорректные данные");
-            await cntr.EditAsync(inlineKeyboardMarkup: InlineKeyboardMarkup.Empty());
+            await cntr.EditAsync(InlineKeyboardMarkup.Empty());
             //StopPropagation();
             return;
         }
 
-        var msgId = cntr.Update.Message!.MessageId;
-        var chatId = cntr.Update.Message!.Chat.Id;
-        var activeChain = await _context.Chains.FindAsync(chainId);
+        int msgId = cntr.Update.Message!.MessageId;
+        long chatId = cntr.Update.Message!.Chat.Id;
+        Chain? activeChain = await _context.Chains.FindAsync(chainId);
         if (activeChain == null)
         {
             await cntr.AnswerAsync("Информация по данной цепочке сообщений отсутсвует");
-            await cntr.EditAsync(inlineKeyboardMarkup: InlineKeyboardMarkup.Empty());
+            await cntr.EditAsync(InlineKeyboardMarkup.Empty());
             //StopPropagation();
             return;
         }
@@ -74,7 +78,8 @@ public sealed class RegularReaction : CallbackQueryHandler
                         supervisorText = "<i>Связь с исполнителем</i>";
                         refersTo = await _context.LocalMessages
                             .Include(lm => lm.ReferenceTo)
-                            .FirstAsync(lm => lm.ReferenceTo!.TelegramMessageId == msgId && lm.ReferenceTo.ChatId == chatId);
+                            .FirstAsync(lm =>
+                                lm.ReferenceTo!.TelegramMessageId == msgId && lm.ReferenceTo.ChatId == chatId);
                     }
                     else if (queryArgs![0].Equals("revision"))
                     {
@@ -85,11 +90,15 @@ public sealed class RegularReaction : CallbackQueryHandler
                             .Where(cl => cl.ForwardedMessage.ChatId == chatId)
                             .Single().RecievedMessage;
                     }
+
                     await cntr.AnswerAsync("Напишите вопрос, как ответ на сообщение");
-                    var pleaseAskMsg = await cntr.SendAsync(
-                        text: supervisorText,
-                        sendAsReply: true, parseMode: ParseMode.Html, disableNotification: true, protectContent: true,
-                        replyMarkup: new ForceReplyMarkup() { InputFieldPlaceholder = "Ваш вопрос...", Selective = true });
+                    IContainer<Message> pleaseAskMsg = await cntr.SendAsync(
+                        supervisorText,
+                        true, ParseMode.Html, disableNotification: true, protectContent: true,
+                        replyMarkup: new ForceReplyMarkup
+                        {
+                            InputFieldPlaceholder = "Ваш вопрос...", Selective = true
+                        });
                     activeChain.Links!.Add(new ChainLink(
                         activeChain,
                         refersTo,
@@ -99,28 +108,38 @@ public sealed class RegularReaction : CallbackQueryHandler
                     ));
                     await _context.SaveChangesAsync();
                     if (activeChain.Links!.All(l => l.Mode != ChainLinkMode.Remark))
-                        await cntr.EditAsync(inlineKeyboardMarkup: InlineKeyboardMarkupWrapper.OnlyRemarkControls(activeChain.Id));
+                    {
+                        await cntr.EditAsync(InlineKeyboardMarkupWrapper.OnlyRemarkControls(activeChain.Id));
+                    }
                     else if (activeChain.Links!.All(l => l.Mode != ChainLinkMode.Revision))
-                        await cntr.EditAsync(inlineKeyboardMarkup: InlineKeyboardMarkupWrapper.OnlyRevisionControls(activeChain.Id));
+                    {
+                        await cntr.EditAsync(InlineKeyboardMarkupWrapper.OnlyRevisionControls(activeChain.Id));
+                    }
                     else
-                        await cntr.EditAsync(inlineKeyboardMarkup: InlineKeyboardMarkup.Empty());
+                    {
+                        await cntr.EditAsync(InlineKeyboardMarkup.Empty());
+                    }
                 }
+
                 break;
             case "question":
                 await _context.Chains.Entry(activeChain).Reference(c => c.Worker).LoadAsync();
                 if (activeChain.Worker!.ChatId == chatId)
                 {
                     await _context.Chains.Entry(activeChain).Collection(c => c.Links!).LoadAsync();
-                    var questionOnMsg = await _context.LocalMessages
+                    LocalMessage questionOnMsg = await _context.LocalMessages
                         .Where(lm => lm.TelegramMessageId == msgId)
                         .Where(lm => lm.ChatId == chainId)
                         .Include(lm => lm.ReferenceTo)
                         .SingleAsync();
                     await cntr.AnswerAsync("Напишите вопрос, как ответ на сообщение");
-                    var pleaseAskMsg = await cntr.SendAsync(
-                        text: "<i>Обратная связь</i>",
-                        sendAsReply: true, parseMode: ParseMode.Html, disableNotification: true, protectContent: true,
-                        replyMarkup: new ForceReplyMarkup() { InputFieldPlaceholder = "Ваш вопрос...", Selective = true });
+                    IContainer<Message> pleaseAskMsg = await cntr.SendAsync(
+                        "<i>Обратная связь</i>",
+                        true, ParseMode.Html, disableNotification: true, protectContent: true,
+                        replyMarkup: new ForceReplyMarkup
+                        {
+                            InputFieldPlaceholder = "Ваш вопрос...", Selective = true
+                        });
                     activeChain.Links!.Add(new ChainLink(
                         activeChain,
                         questionOnMsg.ReferenceTo!,
@@ -130,10 +149,15 @@ public sealed class RegularReaction : CallbackQueryHandler
                     ));
                     await _context.SaveChangesAsync();
                     if (activeChain.TookAt != null)
-                        await cntr.EditAsync(inlineKeyboardMarkup: InlineKeyboardMarkup.Empty());
+                    {
+                        await cntr.EditAsync(InlineKeyboardMarkup.Empty());
+                    }
                     else
-                        await cntr.EditAsync(inlineKeyboardMarkup: InlineKeyboardMarkupWrapper.OnlyTakeControls(activeChain.Id));
+                    {
+                        await cntr.EditAsync(InlineKeyboardMarkupWrapper.OnlyTakeControls(activeChain.Id));
+                    }
                 }
+
                 break;
             case "take":
                 // todo: depends on broadcastins the issue mode, this may require to delete inline markups of other workers
@@ -145,10 +169,15 @@ public sealed class RegularReaction : CallbackQueryHandler
                     await _context.SaveChangesAsync();
                     await cntr.AnswerAsync("Взято в работу");
                     if (activeChain.Links!.Any(l => l.Mode == ChainLinkMode.Question))
-                        await cntr.EditAsync(inlineKeyboardMarkup: InlineKeyboardMarkup.Empty());
+                    {
+                        await cntr.EditAsync(InlineKeyboardMarkup.Empty());
+                    }
                     else
-                        await cntr.EditAsync(inlineKeyboardMarkup: InlineKeyboardMarkupWrapper.OnlyQuestionControls(activeChain.Id));
+                    {
+                        await cntr.EditAsync(InlineKeyboardMarkupWrapper.OnlyQuestionControls(activeChain.Id));
+                    }
                 }
+
                 break;
             case "accept":
                 // todo: the source might accept only one part of the responsed work. there sould be an option for a partial acception;
@@ -162,18 +191,22 @@ public sealed class RegularReaction : CallbackQueryHandler
                     activeChain.FinishedAt = DateTime.UtcNow;
                     await _context.SaveChangesAsync();
                     await cntr.AnswerAsync("Работа принята");
-                    await cntr.EditAsync(inlineKeyboardMarkup: InlineKeyboardMarkup.Empty());
-                    var acceptedMessage = activeChain.Links!.AsQueryable().WhereLinkFits(cntr.Update.Message!, false).ToArray();
-                    foreach (var msg in acceptedMessage)
+                    await cntr.EditAsync(InlineKeyboardMarkup.Empty());
+                    ChainLink[] acceptedMessage = activeChain.Links!.AsQueryable()
+                        .WhereLinkFits(cntr.Update.Message!, false).ToArray();
+                    foreach (ChainLink msg in acceptedMessage)
+                    {
                         await cntr.BotClient.SendTextMessageAsync(
-                            chatId: msg.RecievedMessage.ChatId,
+                            msg.RecievedMessage.ChatId,
                             replyToMessageId: msg.RecievedMessage.TelegramMessageId,
                             text: "<i>Принято</i>",
                             parseMode: ParseMode.Html,
                             protectContent: true,
                             disableNotification: true
                         );
+                    }
                 }
+
                 break;
             case "approve":
                 await _context.Chains.Entry(activeChain).Reference(c => c.Supervisor).LoadAsync();
@@ -186,37 +219,41 @@ public sealed class RegularReaction : CallbackQueryHandler
                         .Include(cl => cl.RecievedMessage.ReferenceTo)
                         .Include(cl => cl.RecievedMessage.Data)
                         .LoadAsync();
-                    var approvedOnLink = activeChain.Links!
+                    ChainLink approvedOnLink = activeChain.Links!
                         .Where(cl => cl.ForwardedMessage.TelegramMessageId == msgId)
                         .Where(cl => cl.ForwardedMessage.ChatId == chatId)
                         .Single();
-                    var toForward = approvedOnLink.ForwardedMessage.Data.MediaGroupId is string mediaGroupId
+                    ChainLink[] toForward = approvedOnLink.ForwardedMessage.Data.MediaGroupId is string mediaGroupId
                         ? activeChain.Links!
                             .Where(l => l.ForwardedMessage.Data.Equals(mediaGroupId))
                             .OrderBy(l => l.ForwardedMessage.TelegramMessageId)
                             .ToArray()
                         : new[] { approvedOnLink };
-                    foreach (var msg in approvedOnLink.ForwardedMessage)
+                    foreach (LocalMessage msg in approvedOnLink.ForwardedMessage)
+                    {
                         if (msg.ChatId == activeChain.SourceChatId)
                         {
-                            var replied = new RepliedMessage
+                            RepliedMessage replied = new RepliedMessage
                             {
                                 ReferenceLinks = toForward,
                                 DestinationMessage = msg,
                                 ReplyItself = toForward.Select((cl, _) => cl.ForwardedMessage),
                                 Markup = InlineKeyboardMarkupWrapper.ReplyToSource(activeChain.Id)
                             };
-                            await _context.ChainLinks.AddRangeAsync(await RegularReply.ForwardReplyMessage(cntr, replied));
+                            await _context.ChainLinks.AddRangeAsync(
+                                await RegularReply.ForwardReplyMessage(cntr, replied));
                             await _context.SaveChangesAsync();
-                            await cntr.AnswerAsync($"Одобрено");
+                            await cntr.AnswerAsync("Одобрено");
                             break;
                         }
+                    }
                 }
+
                 break;
             case "decline":
             case "reject":
-                await cntr.AnswerAsync("Работа отклонена. Ответьте на сообщение, чтобы оставить комментарий", showAlert: false);
-                await cntr.EditAsync(inlineKeyboardMarkup: InlineKeyboardMarkup.Empty());
+                await cntr.AnswerAsync("Работа отклонена. Ответьте на сообщение, чтобы оставить комментарий", false);
+                await cntr.EditAsync(InlineKeyboardMarkup.Empty());
                 break;
             default:
                 await cntr.AnswerAsync("Неизвестная команда");

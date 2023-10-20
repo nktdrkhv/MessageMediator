@@ -5,4 +5,5 @@ namespace MessageMediator.ProofOfConcept.Entities;
 
 [Table("Supervisor")]
 public class Supervisor : ExecutorEntity
-{ }
+{
+}

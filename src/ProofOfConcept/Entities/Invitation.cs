@@ -5,21 +5,10 @@ using Microsoft.EntityFrameworkCore;
 
 namespace MessageMediator.ProofOfConcept.Entities;
 
-[Table("Invitation"), Index(nameof(Code), IsUnique = true)]
+[Table("Invitation")]
+[Index(nameof(Code), IsUnique = true)]
 public class Invitation : ICreatedAt
 {
-    public int Id { get; private set; }
-
-    public DateTime CreatedAt { get; private set; } = DateTime.UtcNow;
-    public DateTime? RedeemAt { get; private set; }
-
-    public int TriggerId { get; private set; }
-    public Trigger Trigger { get; private set; } = null!;
-
-    public InvitationTarget Target { get; private set; }
-    public string Code { get; private set; } = Guid.NewGuid().ToString()[..7];
-    public string NewName { get; private set; } = null!;
-
     public Invitation(Trigger trigger, InvitationTarget target, string newName)
     {
         Trigger = trigger;
@@ -28,6 +17,20 @@ public class Invitation : ICreatedAt
     }
 
     private Invitation() { }
+    public int Id { get; }
+    public DateTime? RedeemAt { get; private set; }
 
-    public void Redeemed() => RedeemAt = DateTime.UtcNow;
+    public int TriggerId { get; }
+    public Trigger Trigger { get; private set; } = null!;
+
+    public InvitationTarget Target { get; private set; }
+    public string Code { get; private set; } = Guid.NewGuid().ToString()[..7];
+    public string NewName { get; private set; } = null!;
+
+    public DateTime CreatedAt { get; } = DateTime.UtcNow;
+
+    public void Redeemed()
+    {
+        RedeemAt = DateTime.UtcNow;
+    }
 }

@@ -6,5 +6,5 @@ public enum MessageDataType
     Media,
     MediaAlbum,
     Contact,
-    Unknown,
+    Unknown
 }

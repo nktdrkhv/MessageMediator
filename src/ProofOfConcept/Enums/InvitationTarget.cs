@@ -4,5 +4,5 @@ public enum InvitationTarget
 {
     SourceRole,
     WorkerRole,
-    SupervisorRole,
+    SupervisorRole
 }

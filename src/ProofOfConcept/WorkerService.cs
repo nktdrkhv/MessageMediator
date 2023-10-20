@@ -6,6 +6,7 @@ using Telegram.Bot.Polling;
 using Telegram.Bot.Types;
 using TelegramUpdater;
 using TelegramUpdater.Hosting;
+using TelegramUpdater.StateKeeping.StateKeepers.NumericStateKeepers;
 
 namespace MessageMediator.ProofOfConcept;
 
@@ -26,21 +27,20 @@ public class WorkerService : UpdateWriterServiceAbs
 
     public override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        using (var scope = _scopeFactory.CreateScope())
+        using (IServiceScope scope = _scopeFactory.CreateScope())
         {
-            var provider = scope.ServiceProvider;
-            var conf = provider.GetRequiredService<IOptions<BotConfiguration>>().Value;
-            var db = provider.GetRequiredService<BotDbContext>();
+            IServiceProvider provider = scope.ServiceProvider;
+            BotConfiguration conf = provider.GetRequiredService<IOptions<BotConfiguration>>().Value;
+            BotDbContext db = provider.GetRequiredService<BotDbContext>();
 
-            Updater.TryGetUserNumericStateKeeper("admin", out var keeper);
-            foreach (var adminId in conf.Administrators)
+            Updater.TryGetUserNumericStateKeeper("admin", out UserNumericStateKeeper? keeper);
+            foreach (long adminId in conf.Administrators)
             {
                 keeper!.SetState(adminId, 0);
-                var commandsScope = BotCommandScope.Chat(new ChatId(adminId));
-                await Updater.BotClient.SetMyCommandsAsync(new BotCommand[]
-                {
-                    new() {Command = "issues", Description = "Распределение задач"},
-                }, scope: commandsScope, cancellationToken: stoppingToken);
+                BotCommandScopeChat commandsScope = BotCommandScope.Chat(new ChatId(adminId));
+                await Updater.BotClient.SetMyCommandsAsync(
+                    new BotCommand[] { new() { Command = "issues", Description = "Распределение задач" } },
+                    commandsScope, cancellationToken: stoppingToken);
             }
         }
 
@@ -48,9 +48,11 @@ public class WorkerService : UpdateWriterServiceAbs
         {
             try
             {
-                var reciever = new QueuedUpdateReceiver(Updater.BotClient);
-                await foreach (var update in reciever.WithCancellation(stoppingToken))
+                QueuedUpdateReceiver reciever = new QueuedUpdateReceiver(Updater.BotClient);
+                await foreach (Update update in reciever.WithCancellation(stoppingToken))
+                {
                     await EnqueueUpdateAsync(update, stoppingToken);
+                }
             }
             catch (TaskCanceledException) { }
             catch (OperationCanceledException) { }

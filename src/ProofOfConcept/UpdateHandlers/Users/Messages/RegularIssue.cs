@@ -1,10 +1,11 @@
-using MessageMediator.ProofOfConcept.Dto;
 using MessageMediator.ProofOfConcept.Configuration;
+using MessageMediator.ProofOfConcept.Dto;
 using MessageMediator.ProofOfConcept.Entities;
 using MessageMediator.ProofOfConcept.Enums;
 using MessageMediator.ProofOfConcept.Extensions;
 using MessageMediator.ProofOfConcept.Persistance;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.Options;
 using Telegram.Bot;
 using Telegram.Bot.Types;
@@ -18,8 +19,8 @@ namespace MessageMediator.ProofOfConcept.UpdateHandlers.Messages;
 [Order(102)]
 public sealed class RegularIssue : MessageHandler
 {
-    private readonly BotDbContext _context;
     private readonly BotConfiguration _conf;
+    private readonly BotDbContext _context;
 
     public RegularIssue(BotDbContext context, IOptions<BotConfiguration> conf)
     {
@@ -33,23 +34,24 @@ public sealed class RegularIssue : MessageHandler
         // ----------- get entities ----------
         // -----------------------------------
 
-        var text = cntr.Update.Text ?? cntr.Update.Caption;
+        string? text = cntr.Update.Text ?? cntr.Update.Caption;
         if (text == null)
+        {
             return;
+        }
 
-        var msgEntities = cntr.Update.Entities ?? cntr.Update.CaptionEntities;
-        var msgEntityValues = cntr.Update.EntityValues ?? cntr.Update.CaptionEntityValues;
-        var entities = msgEntities?.Zip(msgEntityValues!,
+        MessageEntity[]? msgEntities = cntr.Update.Entities ?? cntr.Update.CaptionEntities;
+        IEnumerable<string>? msgEntityValues = cntr.Update.EntityValues ?? cntr.Update.CaptionEntityValues;
+        IEnumerable<OriginalEntity>? entities = msgEntities?.Zip(msgEntityValues!,
             (first, second) => new OriginalEntity
             {
                 // warning: only for hashtags #, mentions @ etc.
-                Text = second[1..],
-                Type = first.Type,
-                Offset = first.Offset,
-                Length = first.Length
+                Text = second[1..], Type = first.Type, Offset = first.Offset, Length = first.Length
             });
         if (entities == null)
+        {
             return;
+        }
 
         // -----------------------------------
         // ---------- match entities ---------
@@ -61,7 +63,7 @@ public sealed class RegularIssue : MessageHandler
                 .Include(lc => lc.SourcingFor)
                 .SingleOrDefaultAsync() is LocalChat chat)
         {
-            var matchesQuery =
+            IQueryable<MatchedTrigger> matchesQuery =
                 from s in chat.SourcingFor!.AsQueryable()
                 join t in _context.Triggers on s.Id equals t.SourceId
                 join e in entities.AsQueryable() on t.Type equals e.Type
@@ -69,20 +71,25 @@ public sealed class RegularIssue : MessageHandler
                 where !s.IsDisabled && !s.IsDeleted && !t.IsDisabled
                 select new MatchedTrigger
                 {
-                    TriggerId = t.Id,
-                    Behaviour = t.Behaviour,
-                    Offset = e.Offset,
-                    Length = e.Length
+                    TriggerId = t.Id, Behaviour = t.Behaviour, Offset = e.Offset, Length = e.Length
                 };
-            var matches = await matchesQuery.ToArrayAsync();
+            MatchedTrigger[] matches = await matchesQuery.ToArrayAsync();
             if (matches.Length == 0)
+            {
                 return;
-            for (var i = 0; i < matches.Length; i++)
+            }
+
+            for (int i = 0; i < matches.Length; i++)
             {
                 if (i - 1 >= 0)
+                {
                     matches[i].Previous = (matches[i - 1].Offset, matches[i - 1].Length);
+                }
+
                 if (i < matches.Length - 1)
+                {
                     matches[i].Next = (matches[i + 1].Offset, matches[i + 1].Length);
+                }
             }
 
             // -----------------------------------
@@ -90,7 +97,9 @@ public sealed class RegularIssue : MessageHandler
             // -----------------------------------
 
             // todo: check fake user in non-channel chats
-            var user = cntr.Update.From != null ? await _context.GetOrCreateLocalUserAsync(cntr.Update.From!) : null;
+            LocalUser? user = cntr.Update.From != null
+                ? await _context.GetOrCreateLocalUserAsync(cntr.Update.From!)
+                : null;
             if ((chat.DecisionMakers != null && user == null) ||
                 (chat.DecisionMakers != null && user != null && !chat.DecisionMakers.Contains(user)))
             {
@@ -107,37 +116,47 @@ public sealed class RegularIssue : MessageHandler
             {
                 List<Message> messageGroup = new() { cntr.Update };
                 while (await AwaitMessageAsync(
-                    filter: null,
-                    timeOut: TimeSpan.FromSeconds(1)) is IContainer<Message> msgCntr && mediaGroup.Equals(msgCntr.Update.MediaGroupId))
+                           null,
+                           TimeSpan.FromSeconds(1)) is IContainer<Message> msgCntr &&
+                       mediaGroup.Equals(msgCntr.Update.MediaGroupId))
+                {
                     messageGroup.Add(msgCntr.Update);
+                }
+
                 origialRecieved = LocalMessage.FromSet(text, messageGroup.OrderBy(m => m.MessageId).ToArray());
             }
             else
+            {
                 origialRecieved = new LocalMessage[] { new(text, cntr.Update) };
+            }
 
             // -----------------------------------
             // ----------- broadcasting ----------
             // -----------------------------------
 
-            await using var transaction = await _context.Database.BeginTransactionAsync();
+            await using IDbContextTransaction transaction = await _context.Database.BeginTransactionAsync();
 
-            foreach (var match in matches)
+            foreach (MatchedTrigger? match in matches)
             {
-                var trigger = _context.Triggers
+                Trigger trigger = _context.Triggers
                     .Where(t => t.Id == match.TriggerId)
                     .AsSplitQuery()
                     .Include(t => t.Workers)
                     .Include(t => t.Supervisors)
                     .Single();
-                var worker = trigger.Workers.First(w => w is { IsDisabled: false, IsDeleted: false });
-                var supervisor = trigger.Supervisors!.FirstOrDefault(s => s is { IsDisabled: false, IsDeleted: false });
+                Worker worker = trigger.Workers.First(w => w is { IsDisabled: false, IsDeleted: false });
+                Supervisor? supervisor =
+                    trigger.Supervisors!.FirstOrDefault(s => s is { IsDisabled: false, IsDeleted: false });
 
                 // -------- poining the data ---------
-                var concreteData = new List<MessageData> { ExtractText(origialRecieved.First().Data, text, match) };
-                foreach (var reason in origialRecieved.Skip(1))
+                List<MessageData> concreteData =
+                    new List<MessageData> { ExtractText(origialRecieved.First().Data, text, match) };
+                foreach (LocalMessage reason in origialRecieved.Skip(1))
+                {
                     concreteData.Add(reason.Data);
+                }
 
-                var chain = new Chain
+                Chain chain = new Chain
                 {
                     Trigger = trigger,
                     SourceChat = chat,
@@ -150,23 +169,24 @@ public sealed class RegularIssue : MessageHandler
 
                 if (supervisor != null && worker.IsOnProbation)
                 {
-                    var sentToSupervisor = await cntr.BotClient.SendIssueToSupervisorAsync(chain);
+                    ICollection<LocalMessage> sentToSupervisor = await cntr.BotClient.SendIssueToSupervisorAsync(chain);
                     await _context.ChainLinks.AddRangeAsync(
                         origialRecieved.Zip(sentToSupervisor).Select(
                             (pair, _) => new ChainLink(chain, pair.First, pair.Second)));
 
-                    var sentToWorker = await cntr.BotClient.SendIssueToWorkerAsync(chain);
+                    ICollection<LocalMessage> sentToWorker = await cntr.BotClient.SendIssueToWorkerAsync(chain);
                     await _context.ChainLinks.AddRangeAsync(
                         sentToSupervisor.Zip(sentToWorker).Select(
                             (pair, _) => new ChainLink(chain, pair.First, pair.Second)));
                 }
                 else
                 {
-                    var sentToWorker = await cntr.BotClient.SendIssueToWorkerAsync(chain);
+                    ICollection<LocalMessage> sentToWorker = await cntr.BotClient.SendIssueToWorkerAsync(chain);
                     await _context.ChainLinks.AddRangeAsync(
                         origialRecieved.Zip(sentToWorker).Select(
                             (pair, _) => new ChainLink(chain, pair.First, pair.Second)));
                 }
+
                 await _context.SaveChangesAsync();
 
                 await transaction.CommitAsync();
@@ -175,30 +195,34 @@ public sealed class RegularIssue : MessageHandler
                 // ---------- admins notify ----------
                 // -----------------------------------
 
-                var triggerLabel = chain.Trigger.Label;
-                var sourceLabel = chat.Alias ?? chat.Name;
-                var workerLabel = worker.Chat.Alias ?? worker.Chat.Name;
+                string? triggerLabel = chain.Trigger.Label;
+                string sourceLabel = chat.Alias ?? chat.Name;
+                string workerLabel = worker.Chat.Alias ?? worker.Chat.Name;
 
-                foreach (var adminId in _conf.Administrators)
+                foreach (long adminId in _conf.Administrators)
+                {
                     await cntr.BotClient.SendTextMessageAsync(adminId,
-                        text:
                         $"Задача <b>{triggerLabel}</b>\nотправлена из <i>{sourceLabel}</i>\nисполнителю <i>{workerLabel}</i>",
                         disableNotification: true,
                         parseMode: ParseMode.Html);
+                }
             }
         }
     }
 
-    public static MessageData ExtractText(MessageData data, string text, MatchedTrigger match) => new(data)
+    public static MessageData ExtractText(MessageData data, string text, MatchedTrigger match)
     {
-        // todo: check array boundaries
-        Text = match.Behaviour switch
+        return new MessageData(data)
         {
-            TriggerBehaviour.Full => text.Trim(),
-            TriggerBehaviour.Before => text[..match.Offset].Trim(),
-            TriggerBehaviour.Between => text[(match.Offset + match.Length)..match.Next.Offset].Trim(),
-            TriggerBehaviour.After => text[(match.Offset + match.Length)..].Trim(),
-            _ => throw new NotImplementedException()
-        }
-    };
+            // todo: check array boundaries
+            Text = match.Behaviour switch
+            {
+                TriggerBehaviour.Full => text.Trim(),
+                TriggerBehaviour.Before => text[..match.Offset].Trim(),
+                TriggerBehaviour.Between => text[(match.Offset + match.Length)..match.Next.Offset].Trim(),
+                TriggerBehaviour.After => text[(match.Offset + match.Length)..].Trim(),
+                _ => throw new NotImplementedException()
+            }
+        };
+    }
 }
